@@ -60,7 +60,57 @@ static void __hexdump(FILE *fp, const char *label, uint8_t *buf, size_t buf_len)
  */
 int ab_generate_dhparams(const char *dhparams_file)
 {
+
+  /* Create the context for generating the parameters */
+  EVP_PKEY_CTX *pctx = NULL;
+  if(!(pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL))) goto err;
+  if(!EVP_PKEY_paramgen_init(pctx)) goto err;
+  /* Set a prime length of 2048 */
+  if(!EVP_PKEY_CTX_set_dh_paramgen_prime_len(pctx, 2048)) goto err;
+  /* Generate parameters */
+  if (!EVP_PKEY_paramgen(pctx, &dh_params)) goto err;
+ 
+  /* set up to sign */
+  EVP_MD_CTX *mdctx = NULL;
+  int ret = 0;
+  *sig = NULL;
+ 
+  /* Create the Message Digest Context */
+  if(!(mdctx = EVP_MD_CTX_create())) goto err;
+  /* Initialise the DigestSign operation - SHA-256 has been selected as the message digest function in this example */
+  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, key)) goto err;
+
+
   
+  /* Call update with the dh_params */
+  if(1 != EVP_DigestSignUpdate(mdctx, dh_params, strlen(dh_params))) goto err;
+  /* Finalise the DigestSign operation */
+  /* First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the
+    * signature. Length is returned in slen */
+  if(1 != EVP_DigestSignFinal(mdctx, NULL, slen)) goto err;
+  /* Allocate memory for the signature based on size in slen */
+  if(!(*sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto err;
+  /* Obtain the signature */
+  if(1 != EVP_DigestSignFinal(mdctx, *sig, slen)) goto err;
+  /* Success */
+  ret = 1;
+ 
+  /* write the params and signature to the file */
+  PEM_write_bio_Parameters(dhparams_file, dh_params);
+  PEM_write_bio_Parameters(dhparams_file, sig);
+  err:
+    if(ret != 1)
+    {
+        printf("error in ab_generate_dhparams");
+      /* Do some error handling */
+      return -1;
+    }
+  
+  /* Clean up */
+ if(*sig && !ret) OPENSSL_free(*sig);
+ if(mdctx) EVP_MD_CTX_destroy(mdctx);
+ EVP_PKEY_CTX_free(pctx);
+
   return 0;
 }
 
@@ -81,6 +131,46 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
                      const char *rsapub_file, const char *dhpair_file, 
                      const char *dhpub_file, const char *sig_file)
 {
+  EVP_PKEY *dh_params = PEM_read_bio_Parameters(dhparams_file, NULL);
+
+
+  /* set up to sign */
+  EVP_MD_CTX *mdctx = NULL;
+  int ret = 0;
+  *sig = NULL;
+ 
+  /* Create the Message Digest Context */
+  if(!(mdctx = EVP_MD_CTX_create())) goto err;
+  /* Initialise the DigestSign operation - SHA-256 has been selected as the message digest function in this example */
+  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, key)) goto err;
+
+
+  
+  /* Call update with the msg */
+  if(1 != EVP_DigestSignUpdate(mdctx, msg, strlen(msg))) goto err;
+  /* Finalise the DigestSign operation */
+  /* First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the
+    * signature. Length is returned in slen */
+  if(1 != EVP_DigestSignFinal(mdctx, NULL, slen)) goto err;
+  /* Allocate memory for the signature based on size in slen */
+  if(!(*sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto err;
+  /* Obtain the signature */
+  if(1 != EVP_DigestSignFinal(mdctx, *sig, slen)) goto err;
+  /* Success */
+  ret = 1;
+  err:
+    if(ret != 1)
+    {
+        printf("error in ab_generate_dhparams");
+      /* Do some error handling */
+      return -1;
+    }
+    
+  /* Clean up */
+ if(*sig && !ret) OPENSSL_free(*sig);
+ if(mdctx) EVP_MD_CTX_destroy(mdctx);
+
+
   return 0;
 }
 
