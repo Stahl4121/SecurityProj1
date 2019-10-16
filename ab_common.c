@@ -145,9 +145,13 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
 
   // write to the files 
   if (!PEM_write_PrivateKey(dhpair_bio, dhpair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_PrivateKey(rsapub_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_PUBKEY(dhpair_bio, dhpair_key)) goto err;
-  if (!PEM_write_PUBKEY(dhpub_bio, rsapair_key)) goto err;
+  if (!PEM_write_PrivateKey(rsapair_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
+  if (!PEM_write_PUBKEY(dhpub_bio, dhpub_key)) goto err;
+  if (!PEM_write_PUBKEY(rsapub_bio, rsapub_key)) goto err;
+
+  BUF_MEM *bptr;
+  BIO_get_mem_ptr(dhpub_bio, &bptr);
+  char * dh_pub_char = bptr->data;
   
   // set up to sign 
   EVP_MD_CTX *mdctx = NULL;
@@ -161,8 +165,8 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
 
 
   
-  // Call update with the msg 
-  if(1 != EVP_DigestSignUpdate(mdctx, msg, strlen(msg))) goto err;
+  // Call update with the memory buffer pointer 
+  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, strlen(dh_pub_char))) goto err;
   // Finalise the DigestSign operation 
   // First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the signature. Length is returned in slen 
   if(1 != EVP_DigestSignFinal(mdctx, NULL, slen)) goto err;
@@ -182,7 +186,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
       if(mdctx) EVP_MD_CTX_destroy(mdctx);
       EVP_PKEY_CTX_free(dh_ctx);
       EVP_PKEY_CTX_free(rsa_ctx);
-
+      BIO_free(dhpub_bio);
       return -1;
     }
     
