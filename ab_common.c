@@ -110,14 +110,26 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
                      const char *rsapub_file, const char *dhpair_file, 
                      const char *dhpub_file, const char *sig_file)
 {
-  /*
+  BIO *dhparams_bio = BIO_new_file(dhparams_file, "r");
+  if(!dhparams_bio) goto err; /* Error occurred */
+  BIO *rsapair_bio = BIO_new_file(rsapair_file, "w");
+  if(!rsapair_bio) goto err; /* Error occurred */
+  BIO *rsapub_bio = BIO_new_file(rsapub_file, "w");
+  if(!rsapub_bio) goto err; /* Error occurred */
+  BIO *dhpair_bio = BIO_new_file(dhpair_file, "w");
+  if(!dhpair_bio) goto err; /* Error occurred */
+  BIO *dhpub_bio = BIO_new_file(dhpub_file, "w");
+  if(!dhpub_bio) goto err; /* Error occurred */
+  BIO *sig_bio = BIO_new_file(sig_file, "w");
+  if(!sig_bio) goto err; /* Error occurred */
+
   EVP_PKEY_CTX *rsa_ctx = NULL;
   EVP_PKEY_CTX *dh_ctx = NULL;
 
   EVP_PKEY *dhpair_key = NULL;
   EVP_PKEY *rsapair_key = NULL;
 
-  EVP_PKEY *dh_params = PEM_read_bio_Parameters(dhparams_file, NULL);
+  EVP_PKEY *dh_params = PEM_read_bio_Parameters(dhparams_bio, NULL);
   if(!(dh_ctx = EVP_PKEY_CTX_new(dh_params, NULL))) goto err; 
   if(!EVP_PKEY_keygen_init(dh_ctx)) goto err; 
   // Generate the dh key pair 
@@ -132,10 +144,10 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if (!EVP_PKEY_keygen(rsa_ctx, &rsapair_key)) goto err;
 
   // write to the files 
-  if (!PEM_write_PrivateKey(dhpair_file, dhpair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_PrivateKey(rsapair_file, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_PUBKEY(dhpair_file, dhpair_key)) goto err;
-  if (!PEM_write_PUBKEY(dhpair_file, rsapair_key)) goto err;
+  if (!PEM_write_PrivateKey(dhpair_bio, dhpair_key, NULL, NULL, 0, 0, NULL)) goto err;
+  if (!PEM_write_PrivateKey(rsapub_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
+  if (!PEM_write_PUBKEY(dhpair_bio, dhpair_key)) goto err;
+  if (!PEM_write_PUBKEY(dhpub_bio, rsapair_key)) goto err;
   
   // set up to sign 
   EVP_MD_CTX *mdctx = NULL;
@@ -161,9 +173,10 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // Success 
   ret = 1;
   err:
+    printf("error in key generation");
     if(ret != 1)
     {
-        printf("error in ab_generate_keys");
+      printf("error in signing");
       // Do some error handling 
       if(*sig && !ret) OPENSSL_free(*sig);
       if(mdctx) EVP_MD_CTX_destroy(mdctx);
@@ -178,7 +191,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(mdctx) EVP_MD_CTX_destroy(mdctx);
   EVP_PKEY_CTX_free(dh_ctx);
   EVP_PKEY_CTX_free(rsa_ctx);
-  */
+  
 
   return 0;
 }
