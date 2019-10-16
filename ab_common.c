@@ -71,7 +71,7 @@ int ab_generate_dhparams(const char *dhparams_file)
   
   /* Create the context for generating the parameters */
   EVP_PKEY_CTX *pctx = NULL;
-  EVP_PKEY_DH *dh_params = NULL;
+  EVP_PKEY *dh_params = NULL;
   if(!(pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL))) goto err;
   if(!EVP_PKEY_paramgen_init(pctx)) goto err;
   /* Set a prime length of 2048 */
@@ -80,17 +80,17 @@ int ab_generate_dhparams(const char *dhparams_file)
   if (!EVP_PKEY_paramgen(pctx, &dh_params)) goto err; 
   /* write the params to the file */
   PEM_write_bio_Parameters(dhparams_bio, dh_params);
-  err:
-    printf("error in ab_generate_dhparams");
-    /* Do some error handling */
-    EVP_PKEY_CTX_free(pctx);
-    return -1;
-    }
   
   /* Clean up */
   EVP_PKEY_CTX_free(pctx);
   BIO_free(dhparams_bio);
   return 0;
+  err:
+    printf("error in ab_generate_dhparams");
+    /* Do some error handling */
+    EVP_PKEY_CTX_free(pctx);
+    return -1;
+  
 }
 
 
