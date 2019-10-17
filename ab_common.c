@@ -128,6 +128,8 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
 
   EVP_PKEY *dhpair_key = NULL;
   EVP_PKEY *rsapair_key = NULL;
+  EVP_PKEY *dhpub_key = NULL;
+  EVP_PKEY *rsapub_key = NULL;
 
   EVP_PKEY *dh_params = PEM_read_bio_Parameters(dhparams_bio, NULL);
   if(!(dh_ctx = EVP_PKEY_CTX_new(dh_params, NULL))) goto err; 
@@ -139,15 +141,15 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(!(rsa_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL))) goto err;
   if(!EVP_PKEY_keygen_init(rsa_ctx)) goto err; 
   // RSA keys set the key length during key generation rather than parameter generation! 
-  if(!EVP_PKEY_CTX_set_rsa_keygen_bits(kctx, 2048)) goto err;
+  if(!EVP_PKEY_CTX_set_rsa_keygen_bits(rsa_ctx, 2048)) goto err;
   // Generate the rsa key pair
   if (!EVP_PKEY_keygen(rsa_ctx, &rsapair_key)) goto err;
 
   // write to the files 
-  if (!PEM_write_PrivateKey(dhpair_bio, dhpair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_PrivateKey(rsapair_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_PUBKEY(dhpub_bio, dhpub_key)) goto err;
-  if (!PEM_write_PUBKEY(rsapub_bio, rsapub_key)) goto err;
+  if (!PEM_write_bio_PrivateKey(dhpair_bio, dhpair_key, NULL, NULL, 0, 0, NULL)) goto err;
+  if (!PEM_write_bio_PrivateKey(rsapair_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
+  if (!PEM_write_bio_PUBKEY(dhpub_bio, dhpub_key)) goto err;
+  if (!PEM_write_bio_PUBKEY(rsapub_bio, rsapub_key)) goto err;
 
   BUF_MEM *bptr;
   BIO_get_mem_ptr(dhpub_bio, &bptr);
@@ -156,28 +158,28 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // set up to sign 
   EVP_MD_CTX *mdctx = NULL;
   int ret = 0;
-  *sig = NULL;
+  char *sig = NULL;
+  size_t *slen = 0;
  
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) goto err;
-  // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function in this example 
-  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, key)) goto err;
-
-
-  
+  // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function
+  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, dhpub_key)) goto err;
   // Call update with the memory buffer pointer 
   if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, strlen(dh_pub_char))) goto err;
   // Finalise the DigestSign operation 
-  // First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the signature. Length is returned in slen 
+  // First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the signature. 
+  // Length is returned in slen 
   if(1 != EVP_DigestSignFinal(mdctx, NULL, slen)) goto err;
   // Allocate memory for the signature based on size in slen 
-  if(!(*sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto err;
+  if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto err;
   // Obtain the signature 
-  if(1 != EVP_DigestSignFinal(mdctx, *sig, slen)) goto err;
+  if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) goto err;
   // Success 
   /////////////////////////////////////
   /// write sig to a file ////////////////
   /////////////////////////////////////
+  BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char));
   ret = 1;
   err:
     printf("error in key generation");
@@ -185,7 +187,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     {
       printf("error in signing");
       // Do some error handling 
-      if(*sig && !ret) OPENSSL_free(*sig);
+      if(*sig && !ret) OPENSSL_free(sig);
       if(mdctx) EVP_MD_CTX_destroy(mdctx);
       EVP_PKEY_CTX_free(dh_ctx);
       EVP_PKEY_CTX_free(rsa_ctx);
@@ -194,7 +196,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     }
     
   // Clean up 
-  if(*sig && !ret) OPENSSL_free(*sig);
+  if(*sig && !ret) OPENSSL_free(sig);
   if(mdctx) EVP_MD_CTX_destroy(mdctx);
   EVP_PKEY_CTX_free(dh_ctx);
   EVP_PKEY_CTX_free(rsa_ctx);
