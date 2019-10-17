@@ -190,7 +190,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   
   cleanup:
     // Clean up 
-    if(*sig && !ret) OPENSSL_free(sig);
+    if(*sig && sigErr) OPENSSL_free(sig);
     if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_CTX_free(dh_ctx);
     EVP_PKEY_CTX_free(rsa_ctx);
