@@ -175,6 +175,9 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // Obtain the signature 
   if(1 != EVP_DigestSignFinal(mdctx, *sig, slen)) goto err;
   // Success 
+  /////////////////////////////////////
+  /// write sig to a file ////////////////
+  /////////////////////////////////////
   ret = 1;
   err:
     printf("error in key generation");
@@ -217,6 +220,13 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
                          const char *dhpub_file, const char *sig_file, 
                          const char *key_file, const char *iv_file)
 {
+  // 	EVP_PKEY_derive()
+  // 	EVP_PKEY_derive() works on a EVP_PKEY_CTX data structure: 
+  //    see EVP_PKEY_CTX_new(), 
+  //    EVP_PKEY_derive_init(), 
+  //    EVP_PKEY_derive_set_peer(), 
+  //    and EVP_PKEY_CTX_free().
+  // 	EVP_PKEY_derive() 
   return 0;
 }
 
@@ -232,6 +242,16 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
  */
 int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file, const char *ctext_file)
 {
+  //////////////////////////////
+  // use AES with CTR /////////
+  /////////////////////////////
+
+  //  EVP_CIPHER_CTX_init()  EVP_CIPHER_CTX_cleanup()
+  //  EVP_aes_256_ctr()
+  //	EVP_EncryptInit()
+  //	EVP_EncryptUpdate()
+  //	EVP_EncryptFinal()
+
   return 0;
 }
 
@@ -248,6 +268,15 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
  */
 int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file, const char *ptext_file)
 {
+  //////////////////////////////
+  // use AES with CTR /////////
+  /////////////////////////////
+  
+  //  EVP_CIPHER_CTX_init()  EVP_CIPHER_CTX_cleanup()
+  //  EVP_aes_256_ctr()
+  //	EVP_DecryptInit()
+  //	EVP_DecryptUpdate()
+  //	EVP_DecryptFinal()
   return 0;
 }
 
