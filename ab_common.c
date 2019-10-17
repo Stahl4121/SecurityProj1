@@ -194,7 +194,12 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_CTX_free(dh_ctx);
     EVP_PKEY_CTX_free(rsa_ctx);
-
+    BIO_free(dhparams_bio);
+    BIO_free(rsapair_bio);
+    BIO_free(rsapub_bio);
+    BIO_free(dhpair_bio);
+    BIO_free(dhpub_bio);
+    BIO_free(sig_bio);
     if(keyErr){
       printf("error in key generation");
       return -1;
@@ -255,7 +260,7 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   //	EVP_EncryptInit()
   //	EVP_EncryptUpdate()
   //	EVP_EncryptFinal()
-  PEM_read_bio_PUBKEY();
+  /*
   BIO *key_bio = BIO_new_file(key_file, "r");
   if(!key_bio) goto cleanup; 
   BIO *iv_bio = BIO_new_file(iv_file, "r");
@@ -264,33 +269,43 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(!ptext_bio) goto cleanup; 
   BIO *ctext_bio = BIO_new_file(ctext_file, "w");
   if(!ctext_bio) goto cleanup; 
+
+  const unsigned char *iv = PEM_read_bio(iv_bio, char **name, char **header, unsigned char **data, long *len);
+  const unsigned char *key =
   EVP_CIPHER_CTX *ctx;
   int len;
   int ciphertext_len;
 
   // Create and initialise the context 
-  if(!(ctx = EVP_CIPHER_CTX_new())) goto err;
+  if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
 
   // Initialise the encryption operation. IMPORTANT - ensure you use a key
-  // and IV size appropriate for your cipher
-  // In this example we are using 256 bit AES (i.e. a 256 bit key). The
+  // and IV size appropriate for your cipher. we are using 256 bit AES (i.e. a 256 bit key). The
   // IV size for *most* modes is the same as the block size. For AES this
   // is 128 bits
-  if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_ctr(), NULL, key, iv))
-      handleErrors();
-
+  if(1 != EVP_EncryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
+  
   // Provide the message to be encrypted, and obtain the encrypted output.
   // EVP_EncryptUpdate can be called multiple times if necessary
-  if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
-      handleErrors();
+  if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)) goto cleanup;
   ciphertext_len = len;
 
   // Finalise the encryption. Further ciphertext bytes may be written at this stage.
-  if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
-      handleErrors();
+  if(1 != EVP_EncryptFinal(ctx, ciphertext + len, &len)) goto cleanup;
   ciphertext_len += len;
   // Clean up
   EVP_CIPHER_CTX_free(ctx);
+
+  cleanup:
+    // Clean up 
+    if(ctx) EVP_MD_CTX_destroy(ctx);
+    EVP_PKEY_CTX_free(key_ctx);
+    BIO_free(key_bio);
+    BIO_free(iv_bio);
+    BIO_free(ptext_bio);
+    BIO_free(ctext_bio);
+
+  */
   return 0;
 }
 
