@@ -174,11 +174,8 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // Allocate memory for the signature based on size in slen 
   if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto err;
   // Obtain the signature 
-  if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) goto err;
-  // Success 
-  /////////////////////////////////////
-  /// write sig to a file ////////////////
-  /////////////////////////////////////
+  if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) goto err;  
+  // write sig to a file 
   BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char));
   ret = 1;
   err:
