@@ -65,32 +65,36 @@ static void __hexdump(FILE *fp, const char *label, uint8_t *buf, size_t buf_len)
  */
 int ab_generate_dhparams(const char *dhparams_file)
 {
+  int err = 1;
   BIO *dhparams_bio;
   dhparams_bio = BIO_new_file(dhparams_file, "w");
-  if(!dhparams_bio) goto err; /* Error occurred */
+  if(!dhparams_bio) goto cleanup; /* Error occurred */
   
   /* Create the context for generating the parameters */
   EVP_PKEY_CTX *pctx = NULL;
   EVP_PKEY *dh_params = NULL;
-  if(!(pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL))) goto err;
-  if(!EVP_PKEY_paramgen_init(pctx)) goto err;
+  if(!(pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL))) goto cleanup;
+  if(!EVP_PKEY_paramgen_init(pctx)) goto cleanup;
   /* Set a prime length of 2048 */
-  if(!EVP_PKEY_CTX_set_dh_paramgen_prime_len(pctx, 2048)) goto err;
+  if(!EVP_PKEY_CTX_set_dh_paramgen_prime_len(pctx, 2048)) goto cleanup;
   /* Generate parameters */
-  if (!EVP_PKEY_paramgen(pctx, &dh_params)) goto err; 
+  if (!EVP_PKEY_paramgen(pctx, &dh_params)) goto cleanup; 
   /* write the params to the file */
   PEM_write_bio_Parameters(dhparams_bio, dh_params);
+  err = 0;
   
-  /* Clean up */
-  EVP_PKEY_CTX_free(pctx);
-  BIO_free(dhparams_bio);
-  return 0;
-  err:
-    printf("error in ab_generate_dhparams");
-    /* Do some error handling */
+  cleanup:
+    /* Clean up */
     EVP_PKEY_CTX_free(pctx);
-    return -1;
-  
+    BIO_free(dhparams_bio);
+
+    /* Do some error handling */
+    if (err){
+      printf("error in ab_generate_dhparams");
+      return -1;
+    }
+    
+  return 0;
 }
 
 
@@ -110,18 +114,20 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
                      const char *rsapub_file, const char *dhpair_file, 
                      const char *dhpub_file, const char *sig_file)
 {
+  int keyErr = 1;
+
   BIO *dhparams_bio = BIO_new_file(dhparams_file, "r");
-  if(!dhparams_bio) goto err; /* Error occurred */
+  if(!dhparams_bio) goto cleanup; /* Error occurred */
   BIO *rsapair_bio = BIO_new_file(rsapair_file, "w");
-  if(!rsapair_bio) goto err; /* Error occurred */
+  if(!rsapair_bio) goto cleanup; /* Error occurred */
   BIO *rsapub_bio = BIO_new_file(rsapub_file, "w");
-  if(!rsapub_bio) goto err; /* Error occurred */
+  if(!rsapub_bio) goto cleanup; /* Error occurred */
   BIO *dhpair_bio = BIO_new_file(dhpair_file, "w");
-  if(!dhpair_bio) goto err; /* Error occurred */
+  if(!dhpair_bio) goto cleanup; /* Error occurred */
   BIO *dhpub_bio = BIO_new_file(dhpub_file, "w");
-  if(!dhpub_bio) goto err; /* Error occurred */
+  if(!dhpub_bio) goto cleanup; /* Error occurred */
   BIO *sig_bio = BIO_new_file(sig_file, "w");
-  if(!sig_bio) goto err; /* Error occurred */
+  if(!sig_bio) goto cleanup; /* Error occurred */
 
   EVP_PKEY_CTX *rsa_ctx = NULL;
   EVP_PKEY_CTX *dh_ctx = NULL;
@@ -132,24 +138,26 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   EVP_PKEY *rsapub_key = NULL;
 
   EVP_PKEY *dh_params = PEM_read_bio_Parameters(dhparams_bio, NULL);
-  if(!(dh_ctx = EVP_PKEY_CTX_new(dh_params, NULL))) goto err; 
-  if(!EVP_PKEY_keygen_init(dh_ctx)) goto err; 
+  if(!(dh_ctx = EVP_PKEY_CTX_new(dh_params, NULL))) goto cleanup; 
+  if(!EVP_PKEY_keygen_init(dh_ctx)) goto cleanup; 
   // Generate the dh key pair 
-  if (!EVP_PKEY_keygen(dh_ctx, &dhpair_key)) goto err;
+  if (!EVP_PKEY_keygen(dh_ctx, &dhpair_key)) goto cleanup;
 
   // RSA 
-  if(!(rsa_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL))) goto err;
-  if(!EVP_PKEY_keygen_init(rsa_ctx)) goto err; 
+  if(!(rsa_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL))) goto cleanup;
+  if(!EVP_PKEY_keygen_init(rsa_ctx)) goto cleanup; 
   // RSA keys set the key length during key generation rather than parameter generation! 
-  if(!EVP_PKEY_CTX_set_rsa_keygen_bits(rsa_ctx, 2048)) goto err;
+  if(!EVP_PKEY_CTX_set_rsa_keygen_bits(rsa_ctx, 2048)) goto cleanup;
   // Generate the rsa key pair
-  if (!EVP_PKEY_keygen(rsa_ctx, &rsapair_key)) goto err;
+  if (!EVP_PKEY_keygen(rsa_ctx, &rsapair_key)) goto cleanup;
 
   // write to the files 
-  if (!PEM_write_bio_PrivateKey(dhpair_bio, dhpair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_bio_PrivateKey(rsapair_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto err;
-  if (!PEM_write_bio_PUBKEY(dhpub_bio, dhpub_key)) goto err;
-  if (!PEM_write_bio_PUBKEY(rsapub_bio, rsapub_key)) goto err;
+  if (!PEM_write_bio_PrivateKey(dhpair_bio, dhpair_key, NULL, NULL, 0, 0, NULL)) goto cleanup;
+  if (!PEM_write_bio_PrivateKey(rsapair_bio, rsapair_key, NULL, NULL, 0, 0, NULL)) goto cleanup;
+  if (!PEM_write_bio_PUBKEY(dhpub_bio, dhpub_key)) goto cleanup;
+  if (!PEM_write_bio_PUBKEY(rsapub_bio, rsapub_key)) goto cleanup;
+
+  keyErr = 0;
 
   BUF_MEM *bptr;
   BIO_get_mem_ptr(dhpub_bio, &bptr);
@@ -157,47 +165,44 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   
   // set up to sign 
   EVP_MD_CTX *mdctx = NULL;
-  int ret = 0;
+  int sigErr = 1;
   char *sig = NULL;
   size_t *slen = 0;
  
   // Create the Message Digest Context 
-  if(!(mdctx = EVP_MD_CTX_create())) goto err;
+  if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
   // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function
-  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, dhpub_key)) goto err;
+  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, dhpub_key)) goto cleanup;
   // Call update with the memory buffer pointer 
-  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, strlen(dh_pub_char))) goto err;
+  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, strlen(dh_pub_char))) goto cleanup;
   // Finalise the DigestSign operation 
   // First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the signature. 
   // Length is returned in slen 
-  if(1 != EVP_DigestSignFinal(mdctx, NULL, slen)) goto err;
+  if(1 != EVP_DigestSignFinal(mdctx, NULL, slen)) goto cleanup;
   // Allocate memory for the signature based on size in slen 
-  if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto err;
+  if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (*slen)))) goto cleanup;
   // Obtain the signature 
-  if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) goto err;  
+  if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) goto cleanup;  
   // write sig to a file 
-  if(1 != BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char))) goto err;
-  ret = 1;
-  err:
-    printf("error in key generation");
-    if(ret != 1)
-    {
-      printf("error in signing");
-      // Do some error handling 
-      if(*sig && !ret) OPENSSL_free(sig);
-      if(mdctx) EVP_MD_CTX_destroy(mdctx);
-      EVP_PKEY_CTX_free(dh_ctx);
-      EVP_PKEY_CTX_free(rsa_ctx);
-      BIO_free(dhpub_bio);
+  if(1 != BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char))) goto cleanup;
+  
+  sigErr = 0;
+  
+  cleanup:
+    // Clean up 
+    if(*sig && !ret) OPENSSL_free(sig);
+    if(mdctx) EVP_MD_CTX_destroy(mdctx);
+    EVP_PKEY_CTX_free(dh_ctx);
+    EVP_PKEY_CTX_free(rsa_ctx);
+
+    if(keyErr){
+      printf("error in key generation");
       return -1;
     }
-    
-  // Clean up 
-  if(*sig && !ret) OPENSSL_free(sig);
-  if(mdctx) EVP_MD_CTX_destroy(mdctx);
-  EVP_PKEY_CTX_free(dh_ctx);
-  EVP_PKEY_CTX_free(rsa_ctx);
-  
+    else if(sigErr){
+      printf("error in signing");
+      return -1;
+    }
 
   return 0;
 }
