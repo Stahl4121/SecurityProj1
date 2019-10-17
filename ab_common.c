@@ -176,7 +176,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // Obtain the signature 
   if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) goto err;  
   // write sig to a file 
-  BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char));
+  if(1 != BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char))) goto err;
   ret = 1;
   err:
     printf("error in key generation");
