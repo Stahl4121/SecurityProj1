@@ -273,12 +273,6 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   //////////////////////////////
   // use AES with CTR /////////
   /////////////////////////////
-
-  //  EVP_CIPHER_CTX_init()  EVP_CIPHER_CTX_cleanup()
-  //  EVP_aes_256_ctr()
-  //	EVP_EncryptInit()
-  //	EVP_EncryptUpdate()
-  //	EVP_EncryptFinal()
   /*
   BIO *key_bio = BIO_new_file(key_file, "r");
   if(!key_bio) goto cleanup; 
@@ -288,9 +282,17 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(!ptext_bio) goto cleanup; 
   BIO *ctext_bio = BIO_new_file(ctext_file, "w");
   if(!ctext_bio) goto cleanup; 
-
-  const unsigned char *iv = PEM_read_bio(iv_bio, char **name, char **header, unsigned char **data, long *len);
-  const unsigned char *key =
+  
+  const int IV_LEN = 128;
+  const int KEY_LEN = 256;
+  ///////////////////////////////////////////////////////////
+  //// CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG /////////
+  ///////////////////////////////////////////////////////////
+  const int MAX_PLAIN_LEN = 100;
+  char iv[IV_LEN];
+  char key[KEY_LEN];
+  if(!BIO_read(iv_bio, iv, IV_LEN));
+  if(!BIO_read(key_bio, key, KEY_LEN));
   EVP_CIPHER_CTX *ctx;
   int len;
   int ciphertext_len;
@@ -299,9 +301,11 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
 
   // Initialise the encryption operation. IMPORTANT - ensure you use a key
-  // and IV size appropriate for your cipher. we are using 256 bit AES (i.e. a 256 bit key). The
-  // IV size for *most* modes is the same as the block size. For AES this
-  // is 128 bits
+  // and IV size appropriate for your cipher. we are using 256 bit AES 
+  // IV size same as the block size: 256 bits?
+  ///////////////////////////////////////////////////////////////////
+  /////////// CHECK WITH DR. AL MOAKAR ON BIT/BLOCK SIZES //////////////
+  ///////////////////////////////////////////////////////////////////
   if(1 != EVP_EncryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
   
   // Provide the message to be encrypted, and obtain the encrypted output.
@@ -344,12 +348,52 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   //////////////////////////////
   // use AES with CTR /////////
   /////////////////////////////
+
+  /*
+  BIO *key_bio = BIO_new_file(key_file, "r");
+  if(!key_bio) goto cleanup; 
+  BIO *iv_bio = BIO_new_file(iv_file, "r");
+  if(!iv_bio) goto cleanup; 
+  BIO *ptext_bio = BIO_new_file(ptext_file, "w");
+  if(!ptext_bio) goto cleanup; 
+  BIO *ctext_bio = BIO_new_file(ctext_file, "r");
+  if(!ctext_bio) goto cleanup; 
   
-  //  EVP_CIPHER_CTX_init()  EVP_CIPHER_CTX_cleanup()
-  //  EVP_aes_256_ctr()
-  //	EVP_DecryptInit()
-  //	EVP_DecryptUpdate()
-  //	EVP_DecryptFinal()
+  const int IV_LEN = 128;
+  const int KEY_LEN = 256;
+  char iv[IV_LEN];
+  char key[KEY_LEN];
+  if(!BIO_read(iv_bio, iv, IV_LEN));
+  if(!BIO_read(key_bio, key, KEY_LEN));
+  
+  EVP_CIPHER_CTX *ctx;
+  int len;
+  int plaintext_len;
+
+  // Create and initialise the context 
+  if(!(ctx = EVP_CIPHER_CTX_new())) goto err;
+
+  // Initialise the decryption operation. IMPORTANT - ensure you use a key
+  // and IV size appropriate for your cipher. we are using 256 bit AES 
+  // IV size same as the block size: 256 bits?
+  ///////////////////////////////////////////////////////////////////
+  /////////// CHECK WITH DR. AL MOAKAR ON BIT/BLOCK SIZES //////////////
+  ///////////////////////////////////////////////////////////////////
+  if(1 != EVP_DecryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
+  
+  // Provide the ciphertext to be decrypted, and obtain the decrypted output.
+  // EVP_DecryptUpdate can be called multiple times if necessary
+  if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) goto cleanup;
+  plaintext_len = len;
+
+  // Finalise the encryption. Further ciphertext bytes may be written at this stage.
+  if(1 != EVP_DecryptFinal(ctx, plaintext + len, &len)) goto cleanup;
+  plaintext_len += len;
+  // Clean up
+  EVP_CIPHER_CTX_free(ctx);
+
+  // return plaintext_len;
+  */
   return 0;
 }
 
