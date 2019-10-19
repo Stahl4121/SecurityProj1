@@ -122,7 +122,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   //Setup for signature 
   EVP_MD_CTX *mdctx = NULL;
   unsigned char *sig = NULL;
-  size_t *slen = 0;
+  size_t *slen = NULL;
 
   //Open Files
   BIO *dhparams_bio = BIO_new_file(dhparams_file, "r");
@@ -171,16 +171,21 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
    * 
   */
 
-  char *dh_pub_char = NULL;
-  BIO_get_mem_data(dhpub_bio, &dh_pub_char);
+
 
   //TODO: Not Sure
   //Retrieve DH public key in order to sign
   // BIO *dhpub_bio_r = BIO_new_file(dhpub_file, "r");
   // if(!dhpub_bio_r) goto cleanup; /* Error occurred */
-  // EVP_PKEY *dhpub_key = PEM_read_bio_PUBKEY(dhpub_bio_r, NULL, 0, NULL);
 
+  //Does this remove data from dhpub bio?
+  // EVP_PKEY *dh_pub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
 
+  char *dh_pub_char = NULL;
+  long dataAmt = BIO_get_mem_data(dhpub_bio, &dh_pub_char);
+  fprintf(stderr, "%s\n", dh_pub_char);
+  fprintf(stderr, "%ld\n", dataAmt);
+  
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) fprintf(stderr, "a");//goto cleanup;
   // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function
@@ -190,7 +195,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     fprintf(stderr, "failed: %s\n", buf);// "b");//goto cleanup;
   }
   // Call update with the memory buffer pointer 
-  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, strlen(dh_pub_char))) fprintf(stderr, "c");//goto cleanup;
+  if(1 != EVP_DigestSignUpdate(mdctx, dhpub_bio, dataAmt)) fprintf(stderr, "c");//goto cleanup;
   // Finalise the DigestSign operation 
   // First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the signature. 
   // Length is returned in slen 
@@ -200,7 +205,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // Obtain the signature 
   if(1 != EVP_DigestSignFinal(mdctx, sig, slen)) fprintf(stderr, "f");//goto cleanup;  
   // write sig to a file 
-  if(1 != BIO_write(sig_bio, dh_pub_char, strlen(dh_pub_char))) fprintf(stderr, "g");//goto cleanup;
+  if(1 != BIO_write(sig_bio, sig, *slen)) fprintf(stderr, "g");//goto cleanup;
   
   sigErr = 0;
 
