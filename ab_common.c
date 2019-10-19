@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/dh.h>
 #include <openssl/pem.h>
@@ -175,12 +176,19 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
 
   //TODO: Not Sure
   //Retrieve DH public key in order to sign
-  EVP_PKEY *dhpub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
-  
+  // BIO *dhpub_bio_r = BIO_new_file(dhpub_file, "r");
+  // if(!dhpub_bio_r) goto cleanup; /* Error occurred */
+  // EVP_PKEY *dhpub_key = PEM_read_bio_PUBKEY(dhpub_bio_r, NULL, 0, NULL);
+
+
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) fprintf(stderr, "a");//goto cleanup;
   // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function
-  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, dhpub_key)) fprintf(stderr, "b");//goto cleanup;
+  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, rsapair_key)){
+    char *buf = malloc(sizeof(unsigned char) * (80));
+    ERR_error_string(ERR_get_error(), buf);
+    fprintf(stderr, "failed: %s\n", buf);// "b");//goto cleanup;
+  }
   // Call update with the memory buffer pointer 
   if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, strlen(dh_pub_char))) fprintf(stderr, "c");//goto cleanup;
   // Finalise the DigestSign operation 
