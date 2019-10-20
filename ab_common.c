@@ -114,6 +114,9 @@ int ab_generate_dhparams(const char *dhparams_file)
 int ab_generate_keys(const char *dhparams_file, const char *rsapair_file, 
                      const char *rsapub_file, const char *dhpair_file, 
                      const char *dhpub_file, const char *sig_file)
+int ab_generate_keys(const char *dhparams_file, const char *rsapair_file, 
+                     const char *rsapub_file, const char *dhpair_file, 
+                     const char *dhpub_file, const char *sig_file)
 {
   //Booleans for error messages
   int keyErr = 1;
@@ -217,25 +220,26 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(1 != EVP_DigestSignFinal(mdctx, sig, &slen)) fprintf(stderr, "f");//goto cleanup;  
  
   // write sig to a file 
-  if(1 != BIO_write(sig_bio, sig, slen)){
-    char *buf = malloc(sizeof(unsigned char) * (80));
-    ERR_error_string(ERR_get_error(), buf);
-    fprintf(stderr, "BIO write failed: %s\n", buf);
+  if(0 >= BIO_write(sig_bio, sig, slen)){
+    fprintf(stderr, "BIO write failed: \n%s\n", sig);
   }//goto cleanup; fprintf(stderr, "g");//goto cleanup;
   
   sigErr = 0;
 
   cleanup:
     if(sig && sigErr) OPENSSL_free(sig);
-    // if(mdctx) EVP_MD_CTX_destroy(mdctx);
-    // EVP_PKEY_CTX_free(dh_ctx);
-    // EVP_PKEY_CTX_free(rsa_ctx);
-    // BIO_free(dhparams_bio);
-    // BIO_free(rsapair_bio);
-    // BIO_free(rsapub_bio);
-    // BIO_free(dhpair_bio);
-    // BIO_free(dhpub_bio);
-    // BIO_free(sig_bio);
+    if(mdctx) EVP_MD_CTX_destroy(mdctx);
+    EVP_PKEY_CTX_free(dh_ctx);
+    EVP_PKEY_CTX_free(rsa_ctx);
+    EVP_PKEY_free(dh_params);
+    EVP_PKEY_free(dhpair_key);
+    EVP_PKEY_free(rsapair_key);
+    BIO_free(dhparams_bio);
+    BIO_free(rsapair_bio);
+    BIO_free(rsapub_bio);
+    BIO_free(dhpair_bio);
+    BIO_free(dhpub_bio);
+    BIO_free(sig_bio);
     if(keyErr){
       fprintf(stderr, "error in key generation");
     }
