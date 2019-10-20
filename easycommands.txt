@@ -1,0 +1,15 @@
+./alice generate-dhparams a/dh_params.pem; cp a/dh_params.pem b/dh_params.pem
+
+./alice generate-keys a/dh_params.pem a/rsa_pair.pem a/rsa_pub.pem a/dh_pair.pem a/dh_pub.pem a/dh_pub.sig ; cp a/rsa_pub.pem b/alice_rsa_pub.pem ; cp a/dh_pub.pem b/alice_dh_pub.pem ; cp a/dh_pub.sig b/alice_dh_pub.sig
+
+./bob generate-keys b/dh_params.pem b/rsa_pair.pem b/rsa_pub.pem b/dh_pair.pem b/dh_pub.pem b/dh_pub.sig ;cp b/rsa_pub.pem a/bob_rsa_pub.pem ;cp b/dh_pub.pem a/bob_dh_pub.pem ; cp b/dh_pub.sig a/bob_dh_pub.sig
+
+./alice derive a/bob_rsa_pub.pem a/dh_pair.pem a/bob_dh_pub.pem a/bob_dh_pub.sig a/key.dat a/iv.dat
+
+./bob derive b/alice_rsa_pub.pem b/dh_pair.pem b/alice_dh_pub.pem b/alice_dh_pub.sig b/key.dat b/iv.dat
+
+diff a/key.dat b/key.dat; diff a/iv.dat b/iv.dat
+
+echo "This is a message" > a/plaintext.dat ;./alice encrypt a/key.dat a/iv.dat a/plaintext.dat a/ciphertext.dat ; cp a/ciphertext.dat b/alice_ciphertext.dat
+
+./bob decrypt b/key.dat b/iv.dat b/alice_ciphertext.dat b/plaintext.dat ;cat b/plaintext.dat

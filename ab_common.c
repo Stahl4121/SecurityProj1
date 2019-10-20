@@ -173,14 +173,14 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
 
   //TODO: Not Sure
   int dh_char_len = 100;
-  char *dh_pub_char = malloc(sizeof(char)*dh_char_len);
+  unsigned char *dh_pub_char = malloc(sizeof(unsigned char)*dh_char_len);
   //long dataAmt = BIO_get_mem_data(dhpub_bio_r, &dh_pub_char);
 
   BIO *dhpub_bio_r = BIO_new_file(dhpub_file, "r");
   if(!dhpub_bio_r) goto cleanup; /* Error occurred */
 
   long data_amt = BIO_read(dhpub_bio_r, dh_pub_char, dh_char_len); 
-  size_t dataLen = sizeof(char)*dh_char_len;
+  size_t dataLen = sizeof(unsigned char)*dh_char_len;
   fprintf(stderr, "%s\n", dh_pub_char);
   fprintf(stderr, "%ld\n", data_amt);
   
@@ -210,7 +210,8 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   fprintf(stderr, "DigestSignFinal passed\n");
  
   // Allocate memory for the signature based on size in slen 
-  if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (slen)))) fprintf(stderr, "e");//goto cleanup;
+  if(!(sig = OPENSSL_malloc(slen))) fprintf(stderr, "e");//goto cleanup;
+  //if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (slen)))) fprintf(stderr, "e");//goto cleanup;
  
   // Obtain the signature 
   if(1 != EVP_DigestSignFinal(mdctx, sig, &slen)) fprintf(stderr, "f");//goto cleanup;  
@@ -223,7 +224,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   sigErr = 0;
 
   cleanup:
-    if(sig && sigErr) OPENSSL_free(sig);
+    if(sig) OPENSSL_free(sig);
     if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_CTX_free(dh_ctx);
     EVP_PKEY_CTX_free(rsa_ctx);
@@ -264,14 +265,95 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
                          const char *dhpub_file, const char *sig_file, 
                          const char *key_file, const char *iv_file)
 {
-  // 	EVP_PKEY_derive()
-  // 	EVP_PKEY_derive() works on a EVP_PKEY_CTX data structure: 
-  //    see EVP_PKEY_CTX_new(), 
-  //    EVP_PKEY_derive_init(), 
-  //    EVP_PKEY_derive_set_peer(), 
-  //    and EVP_PKEY_CTX_free().
-  // 	EVP_PKEY_derive() 
-  return 0;
+  EVP_PKEY_CTX *dh_ctx;
+  unsigned char *skey;
+  size_t skeylen;
+  int err = 1;
+
+  //Open Files
+  BIO *rsapub_bio = BIO_new_file(rsapub_file, "r");
+  if(!rsapub_bio) goto cleanup; /* Error occurred */
+  BIO *dhpair_bio = BIO_new_file(dhpair_file, "r");
+  if(!dhpair_bio) goto cleanup; /* Error occurred */
+  BIO *dhpub_bio = BIO_new_file(dhpub_file, "r");
+  if(!dhpub_bio) goto cleanup; /* Error occurred */
+  BIO *sig_bio = BIO_new_file(sig_file, "r");
+  if(!sig_bio) goto cleanup; /* Error occurred */
+  BIO *key_bio = BIO_new_file(key_file, "w");
+  if(!key_bio) goto cleanup; /* Error occurred */
+  BIO *iv_bio = BIO_new_file(iv_file, "w");
+  if(!iv_bio) goto cleanup; /* Error occurred */
+
+  //Read PEM-encoded keys into EVP_PKEY structures
+  EVP_PKEY *dh_key_pair = PEM_read_bio_PrivateKey(dhpair_bio, NULL, 0, NULL);
+  EVP_PKEY *rsa_pub_key = PEM_read_bio_PUBKEY(rsapub_bio, NULL, 0, NULL);
+  EVP_PKEY *dh_pub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
+  if (!dh_key_pair || !rsa_pub_key || !dh_pub_key) goto cleanup; /* Error occurred */
+
+
+  // //TODO: Verify signature
+
+  // // Create the Message Digest Context 
+  // if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
+
+  // if(1 != EVP_DigestVerifyInit(mdctx, NULL, EVP_sha256(), NULL, dh_pub_key)) goto cleanup;
+
+  // /* Initialize `key` with a public key */
+  // if(1 != EVP_DigestVerifyUpdate(mdctx, msg, strlen(msg))) goto cleanup;
+
+  // if(1 == EVP_DigestVerifyFinal(mdctx, sig, slen))
+  // {
+  //     /* Success */
+  // }
+  // else
+  // {
+  //     /* Failure */
+  // }
+
+  //Setup context
+  if(!(dh_ctx = EVP_PKEY_CTX_new(dh_key_pair, NULL))) goto cleanup; /* Error */
+  if (EVP_PKEY_derive_init(dh_ctx) <= 0) goto cleanup; /* Error */
+  if (EVP_PKEY_derive_set_peer(dh_ctx, dh_pub_key) <= 0){
+    char *buf = malloc(sizeof(unsigned char) * (80));
+    ERR_error_string(ERR_get_error(), buf);
+    fprintf(stderr, "failed: %s\n", buf);// "b");//goto cleanup;
+  }// goto cleanup; /* Error */
+
+  /* Determine buffer length */
+  if (EVP_PKEY_derive(dh_ctx, NULL, &skeylen) <= 0) goto cleanup; /* Error */
+
+  //Allocate memory
+  if (!(skey = OPENSSL_malloc(skeylen))) goto cleanup; /* Error, malloc failure */
+
+  //Derive secret key
+  if (EVP_PKEY_derive(dh_ctx, skey, &skeylen) <= 0) goto cleanup; /* Error */
+
+  //TODO: Don't know how to do this correctly
+  //Write first 256 bytes of skey to a file (matches DH keysize of 2048bits)
+  if(0 >= BIO_write(key_bio, skey, 256)) goto cleanup;
+  if(0 >= BIO_write(iv_bio, skey, 16)) goto cleanup;
+
+  err = 0;
+
+  cleanup:
+    if(skey) OPENSSL_free(skey);
+    EVP_PKEY_CTX_free(dh_ctx);
+    EVP_PKEY_free(dh_key_pair);
+    EVP_PKEY_free(rsa_pub_key);
+    EVP_PKEY_free(dh_pub_key);
+    BIO_free(rsapub_bio);
+    BIO_free(dhpair_bio);
+    BIO_free(dhpub_bio);
+    BIO_free(sig_bio);
+    BIO_free(key_bio);
+    BIO_free(iv_bio);
+
+    if(err){
+      fprintf(stderr, "error");
+    }
+
+  //Returns -1 if error occured
+  return -1 * err;
 }
 
 /*
