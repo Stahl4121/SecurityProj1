@@ -114,9 +114,6 @@ int ab_generate_dhparams(const char *dhparams_file)
 int ab_generate_keys(const char *dhparams_file, const char *rsapair_file, 
                      const char *rsapub_file, const char *dhpair_file, 
                      const char *dhpub_file, const char *sig_file)
-int ab_generate_keys(const char *dhparams_file, const char *rsapair_file, 
-                     const char *rsapub_file, const char *dhpair_file, 
-                     const char *dhpub_file, const char *sig_file)
 {
   //Booleans for error messages
   int keyErr = 1;
@@ -175,18 +172,17 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   */
 
   //TODO: Not Sure
-  //Retrieve DH public key in order to sign
-  // BIO *dhpub_bio_r = BIO_new_file(dhpub_file, "r");
-  // if(!dhpub_bio_r) goto cleanup; /* Error occurred */
+  int dh_char_len = 100;
+  char *dh_pub_char = malloc(sizeof(char)*dh_char_len);
+  //long dataAmt = BIO_get_mem_data(dhpub_bio_r, &dh_pub_char);
 
-  //Does this remove data from dhpub bio?
-  // EVP_PKEY *dh_pub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
+  BIO *dhpub_bio_r = BIO_new_file(dhpub_file, "r");
+  if(!dhpub_bio_r) goto cleanup; /* Error occurred */
 
-  char *dh_pub_char = "hello";//NULL;
-  size_t dataLen = strlen(dh_pub_char);
-  //long dataAmt = sizeof(unsigned char) * (80);//BIO_get_mem_data(dhpub_bio, &dh_pub_char);
-  //fprintf(stderr, "%s\n", dh_pub_char);
-  //fprintf(stderr, "%ld\n", dataAmt);
+  long data_amt = BIO_read(dhpub_bio_r, dh_pub_char, dh_char_len); 
+  size_t dataLen = sizeof(char)*dh_char_len;
+  fprintf(stderr, "%s\n", dh_pub_char);
+  fprintf(stderr, "%ld\n", data_amt);
   
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) fprintf(stderr, "a");//goto cleanup;
