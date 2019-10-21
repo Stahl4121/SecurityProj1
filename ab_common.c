@@ -135,7 +135,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(!dhpair_bio) goto cleanup; /* Error occurred */
   BIO *dhpub_bio = BIO_new_file(dhpub_file, "w");
   if(!dhpub_bio) goto cleanup; /* Error occurred */
-  BIO *sig_bio = BIO_new_file(sig_file, "w");
+  FILE *sig_bio = fopen(sig_file, "wb+");
   if(!sig_bio) goto cleanup; /* Error occurred */
 
   EVP_PKEY_CTX *rsa_ctx = NULL;
@@ -277,12 +277,12 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if(!dhpair_bio) goto cleanup; /* Error occurred */
   BIO *dhpub_bio = BIO_new_file(dhpub_file, "r");
   if(!dhpub_bio) goto cleanup; /* Error occurred */
-  BIO *sig_bio = BIO_new_file(sig_file, "r");
-  if(!sig_bio) goto cleanup; /* Error occurred */
-  BIO *key_bio = BIO_new_file(key_file, "w");
-  if(!key_bio) goto cleanup; /* Error occurred */
-  BIO *iv_bio = BIO_new_file(iv_file, "w");
-  if(!iv_bio) goto cleanup; /* Error occurred */
+  FILE *sig_bin = fopen(sig_file, "r");
+  if(!sig_bin) goto cleanup; /* Error occurred */
+  FILE *key_bin = fopen(key_file, "wb+");
+  if(!key_bin) goto cleanup; /* Error occurred */
+  FILE *iv_bin = fopen(iv_file, "wb+");
+  if(!iv_bin) goto cleanup; /* Error occurred */
 
   //Read PEM-encoded keys into EVP_PKEY structures
   EVP_PKEY *dh_key_pair = PEM_read_bio_PrivateKey(dhpair_bio, NULL, 0, NULL);
@@ -330,8 +330,8 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
 
   //TODO: Don't know how to do this correctly
   //Write first 256 bytes of skey to a file (matches DH keysize of 2048bits)
-  if(0 >= BIO_write(key_bio, skey, 256)) goto cleanup;
-  if(0 >= BIO_write(iv_bio, skey, 16)) goto cleanup;
+  if(0 >= fwrite(skey, 1, 256, key_bin)) goto cleanup;
+  if(0 >= fwrite(skey, 1, 16, iv_bin)) goto cleanup;
 
   err = 0;
 
@@ -344,9 +344,9 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
     BIO_free(rsapub_bio);
     BIO_free(dhpair_bio);
     BIO_free(dhpub_bio);
-    BIO_free(sig_bio);
-    BIO_free(key_bio);
-    BIO_free(iv_bio);
+    fclose(sig_bin);
+    fclose(key_bin);
+    fclose(iv_bin);
 
     if(err){
       fprintf(stderr, "error");
@@ -371,17 +371,17 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   //////////////////////////////
   // use AES with CTR /////////
   /////////////////////////////
-  /*
-  BIO *key_bio = BIO_new_file(key_file, "r");
-  if(!key_bio) goto cleanup; 
-  BIO *iv_bio = BIO_new_file(iv_file, "r");
-  if(!iv_bio) goto cleanup; 
-  BIO *ptext_bio = BIO_new_file(ptext_file, "r");
-  if(!ptext_bio) goto cleanup; 
-  BIO *ctext_bio = BIO_new_file(ctext_file, "w");
-  if(!ctext_bio) goto cleanup; 
   
-  const int IV_LEN = 128;
+  FILE *key_bin = fopen(key_file, "rb");
+  if(!key_bin) goto cleanup; 
+  FILE *iv_bin = fopen(iv_file, "rb");
+  if(!iv_bin) goto cleanup; 
+  FILE *ptext_bin = fopen(ptext_file, "rb");
+  if(!ptext_bin) goto cleanup; 
+  FILE *ctext_bin = fopen(ctext_file, "wb+");
+  if(!ctext_bin) goto cleanup; 
+  
+  const int IV_LEN = 16;
   const int KEY_LEN = 256;
   ///////////////////////////////////////////////////////////
   //// CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG /////////
@@ -389,8 +389,8 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   const int MAX_PLAIN_LEN = 100;
   char iv[IV_LEN];
   char key[KEY_LEN];
-  if(!BIO_read(iv_bio, iv, IV_LEN));
-  if(!BIO_read(key_bio, key, KEY_LEN));
+  if(!fread(iv, IV_LEN, 1, iv_bin));
+  if(!fread(key, KEY_LEN, 1, key_bin));
   EVP_CIPHER_CTX *ctx;
   int len;
   int ciphertext_len;
@@ -421,12 +421,12 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
     // Clean up 
     if(ctx) EVP_MD_CTX_destroy(ctx);
     EVP_PKEY_CTX_free(key_ctx);
-    BIO_free(key_bio);
-    BIO_free(iv_bio);
-    BIO_free(ptext_bio);
-    BIO_free(ctext_bio);
+    fclose(key_bin);
+    fclose(iv_bin);
+    fclose(ptext_bin);
+    fclose(ctext_bin);
 
-  */
+  
   return 0;
 }
 
@@ -447,22 +447,21 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   // use AES with CTR /////////
   /////////////////////////////
 
-  /*
-  BIO *key_bio = BIO_new_file(key_file, "r");
-  if(!key_bio) goto cleanup; 
-  BIO *iv_bio = BIO_new_file(iv_file, "r");
-  if(!iv_bio) goto cleanup; 
-  BIO *ptext_bio = BIO_new_file(ptext_file, "w");
-  if(!ptext_bio) goto cleanup; 
-  BIO *ctext_bio = BIO_new_file(ctext_file, "r");
-  if(!ctext_bio) goto cleanup; 
-  
-  const int IV_LEN = 128;
+  FILE *key_bin = fopen(key_file, "rb");
+  if(!key_bin) goto cleanup; 
+  FILE *iv_bin = fopen(iv_file, "rb");
+  if(!iv_bin) goto cleanup; 
+  FILE *ptext_bin = fopen(ptext_file, "wb+");
+  if(!ptext_bin) goto cleanup; 
+  FILE *ctext_bin = fopen(ctext_file, "rb");
+  if(!ctext_bin) goto cleanup; 
+ 
+  const int IV_LEN = 16;
   const int KEY_LEN = 256;
   char iv[IV_LEN];
   char key[KEY_LEN];
-  if(!BIO_read(iv_bio, iv, IV_LEN));
-  if(!BIO_read(key_bio, key, KEY_LEN));
+  if(!fread(iv, IV_LEN, 1, iv_bin));
+  if(!fread(key, KEY_LEN, 1, key_bin));
   
   EVP_CIPHER_CTX *ctx;
   int len;
@@ -491,7 +490,15 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   EVP_CIPHER_CTX_free(ctx);
 
   // return plaintext_len;
-  */
+  cleanup:
+    // Clean up 
+    if(ctx) EVP_MD_CTX_destroy(ctx);
+    EVP_PKEY_CTX_free(key_ctx);
+    fclose(key_bin);
+    fclose(iv_bin);
+    fclose(ptext_bin);
+    fclose(ctext_bin);
+
   return 0;
 }
 
