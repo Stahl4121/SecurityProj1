@@ -121,7 +121,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   
   //Setup for signature 
   EVP_MD_CTX *mdctx = NULL;
-  unsigned char *sig = NULL;
+  uint8_t *sig = NULL;
   size_t slen;
 
   //Open Files
@@ -195,10 +195,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(1 != EVP_DigestSignFinal(mdctx, NULL, &slen)) goto cleanup;
  
   // Allocate memory for the signature based on size in slen 
-  /////////////////////////////////////////////
-  ///// TODO: OPENSSL_malloc vs malloc? ///////
-  //////////////////////////////////////////// 
-  if(!(sig = OPENSSL_malloc(slen))) goto cleanup;
+  if(!(sig = malloc(slen))) goto cleanup;
  
   // Obtain the signature 
   if(1 != EVP_DigestSignFinal(mdctx, sig, &slen)) goto cleanup;  
