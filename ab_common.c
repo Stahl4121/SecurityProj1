@@ -396,8 +396,7 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
 
   cleanup:
     // Clean up 
-    if(ctx) EVP_MD_CTX_destroy(ctx);
-    EVP_PKEY_CTX_free(key_ctx);
+    if(ctx) EVP_CIPHER_CTX_free(ctx);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
@@ -469,8 +468,7 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   // return plaintext_len;
   cleanup:
     // Clean up 
-    if(ctx) EVP_MD_CTX_destroy(ctx);
-    EVP_PKEY_CTX_free(ctx);
+    if(ctx) EVP_CIPHER_CTX_free(ctx);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
