@@ -138,6 +138,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   FILE *sig_bin = fopen(sig_file, "wb+");
   if(!sig_bin) goto cleanup; /* Error occurred */
 
+
   EVP_PKEY_CTX *rsa_ctx = NULL;
   EVP_PKEY_CTX *dh_ctx = NULL;
   
@@ -171,51 +172,39 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
    * 
   */
 
-  char *dh_pub_char = NULL;
-  long data_amt = BIO_get_mem_data(dhpub_bio, &dh_pub_char);
+  BIO *dhpub_mem_bio = BIO_new(BIO_s_mem());
+  if(!dhpub_mem_bio) goto cleanup; /* Error occurred */
 
-  fprintf(stderr, "%s\n", dh_pub_char);
-  fprintf(stderr, "%ld\n", data_amt);
+  if (!PEM_write_bio_PUBKEY(dhpub_mem_bio, rsapair_key)) goto cleanup;
+
+  char *dh_pub_char = NULL;
+  long data_amt = BIO_get_mem_data(dhpub_mem_bio, &dh_pub_char);
   
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) fprintf(stderr, "a");//goto cleanup;
 
   // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function
-  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, rsapair_key)){
-    char *buf = malloc(sizeof(unsigned char) * (80));
-    ERR_error_string(ERR_get_error(), buf);
-    fprintf(stderr, "DigestSignInit failed: %s\n", buf);// "b");//goto cleanup;
-  }
-  fprintf(stderr, "DigestSignInit passed\n");
+  if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, rsapair_key)) goto cleanup;
 
   // Call update with the memory buffer pointer 
-  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, data_amt)) fprintf(stderr, "c");//goto cleanup;
-  fprintf(stderr, "DigestSignUpdate passed\n");
+  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, data_amt)) goto cleanup;
 
   // Finalise the DigestSign operation 
   // First call EVP_DigestSignFinal with a NULL sig parameter to obtain the length of the signature. 
   // Length is returned in slen 
-  if(1 != EVP_DigestSignFinal(mdctx, NULL, &slen)){
-    char *buf = malloc(sizeof(unsigned char) * (80));
-    ERR_error_string(ERR_get_error(), buf);
-    fprintf(stderr, "DigestSignFinal failed: %s\n", buf);// "b");//goto cleanup;
-  }//goto cleanup;
-  fprintf(stderr, "DigestSignFinal passed\n");
+  if(1 != EVP_DigestSignFinal(mdctx, NULL, &slen)) goto cleanup;
  
   // Allocate memory for the signature based on size in slen 
   /////////////////////////////////////////////
   ///// TODO: OPENSSL_malloc vs malloc? ///////
   //////////////////////////////////////////// 
-  if(!(sig = OPENSSL_malloc(slen))) fprintf(stderr, "e");//goto cleanup;
-  //if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (slen)))) fprintf(stderr, "e");//goto cleanup;
+  if(!(sig = OPENSSL_malloc(slen))) goto cleanup;
  
   // Obtain the signature 
-  if(1 != EVP_DigestSignFinal(mdctx, sig, &slen)) fprintf(stderr, "f");//goto cleanup;  
+  if(1 != EVP_DigestSignFinal(mdctx, sig, &slen)) goto cleanup;  
  
   // write sig to a file 
-  if(0 >= fwrite(sig, slen, 1, sig_bin)){
-    fprintf(stderr, "binary write failed: \n%s\n", sig);
-  }//goto cleanup; fprintf(stderr, "g");//goto cleanup;
+  if(0 >= fwrite(sig, slen, 1, sig_bin)) goto cleanup;
   
   sigErr = 0;
 
@@ -232,6 +221,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     BIO_free(rsapub_bio);
     BIO_free(dhpair_bio);
     BIO_free(dhpub_bio);
+    BIO_free(dhpub_mem_bio);
     fclose(sig_bin);
     if(keyErr){
       fprintf(stderr, "error in key generation");
