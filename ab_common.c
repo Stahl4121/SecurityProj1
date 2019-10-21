@@ -135,8 +135,8 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(!dhpair_bio) goto cleanup; /* Error occurred */
   BIO *dhpub_bio = BIO_new_file(dhpub_file, "w");
   if(!dhpub_bio) goto cleanup; /* Error occurred */
-  FILE *sig_bio = fopen(sig_file, "wb+");
-  if(!sig_bio) goto cleanup; /* Error occurred */
+  FILE *sig_bin = fopen(sig_file, "wb+");
+  if(!sig_bin) goto cleanup; /* Error occurred */
 
   EVP_PKEY_CTX *rsa_ctx = NULL;
   EVP_PKEY_CTX *dh_ctx = NULL;
@@ -203,6 +203,9 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   fprintf(stderr, "DigestSignFinal passed\n");
  
   // Allocate memory for the signature based on size in slen 
+  /////////////////////////////////////////////
+  ///// TODO: OPENSSL_malloc vs malloc? ///////
+  //////////////////////////////////////////// 
   if(!(sig = OPENSSL_malloc(slen))) fprintf(stderr, "e");//goto cleanup;
   //if(!(sig = OPENSSL_malloc(sizeof(unsigned char) * (slen)))) fprintf(stderr, "e");//goto cleanup;
  
@@ -210,8 +213,8 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(1 != EVP_DigestSignFinal(mdctx, sig, &slen)) fprintf(stderr, "f");//goto cleanup;  
  
   // write sig to a file 
-  if(0 >= BIO_write(sig_bio, sig, slen)){
-    fprintf(stderr, "BIO write failed: \n%s\n", sig);
+  if(0 >= fwrite(sig, slen, 1, sig_bin)){
+    fprintf(stderr, "binary write failed: \n%s\n", sig);
   }//goto cleanup; fprintf(stderr, "g");//goto cleanup;
   
   sigErr = 0;
@@ -229,7 +232,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     BIO_free(rsapub_bio);
     BIO_free(dhpair_bio);
     BIO_free(dhpub_bio);
-    BIO_free(sig_bio);
+    fclose(sig_bin);
     if(keyErr){
       fprintf(stderr, "error in key generation");
     }
@@ -343,10 +346,6 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
  */
 int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file, const char *ctext_file)
 {
-  //////////////////////////////
-  // use AES with CTR /////////
-  /////////////////////////////
-  
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) goto cleanup; 
   FILE *iv_bin = fopen(iv_file, "rb");
@@ -374,11 +373,8 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
 
   // Initialise the encryption operation. IMPORTANT - ensure you use a key
-  // and IV size appropriate for your cipher. we are using 256 bit AES 
-  // IV size same as the block size: 256 bits?
-  ///////////////////////////////////////////////////////////////////
-  /////////// CHECK WITH DR. AL MOAKAR ON BIT/BLOCK SIZES //////////////
-  ///////////////////////////////////////////////////////////////////
+  // and IV size appropriate for your cipher. we are using 256  AES 
+  // IV size same as the block size: 128 bits?
   if(1 != EVP_EncryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
   
   // Provide the message to be encrypted, and obtain the encrypted output.
@@ -418,10 +414,6 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
  */
 int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file, const char *ptext_file)
 {
-  //////////////////////////////
-  // use AES with CTR /////////
-  /////////////////////////////
-
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) goto cleanup; 
   FILE *iv_bin = fopen(iv_file, "rb");
@@ -446,11 +438,7 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   if(!(ctx = EVP_CIPHER_CTX_new())) goto err;
 
   // Initialise the decryption operation. IMPORTANT - ensure you use a key
-  // and IV size appropriate for your cipher. we are using 256 bit AES 
-  // IV size same as the block size: 256 bits?
-  ///////////////////////////////////////////////////////////////////
-  /////////// CHECK WITH DR. AL MOAKAR ON BIT/BLOCK SIZES //////////////
-  ///////////////////////////////////////////////////////////////////
+  // and IV size appropriate for your cipher. we are using 256 AES 
   if(1 != EVP_DecryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
   
   // Provide the ciphertext to be decrypted, and obtain the decrypted output.
