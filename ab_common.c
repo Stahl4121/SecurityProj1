@@ -248,6 +248,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
                          const char *dhpub_file, const char *sig_file, 
                          const char *key_file, const char *iv_file)
 {
+  int err = 1;
   EVP_PKEY_CTX *dh_ctx;
   unsigned char *skey;
   size_t skeylen;
@@ -265,7 +266,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if(!key_bin) goto cleanup; /* Error occurred */
   FILE *iv_bin = fopen(iv_file, "wb+");
   if(!iv_bin) goto cleanup; /* Error occurred */
-  if(err) goto cleanup;
+
   //Read PEM-encoded keys into EVP_PKEY structures
   EVP_PKEY *dh_key_pair = PEM_read_bio_PrivateKey(dhpair_bio, NULL, 0, NULL);
   EVP_PKEY *rsa_pub_key = PEM_read_bio_PUBKEY(rsapub_bio, NULL, 0, NULL);
@@ -287,7 +288,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if (EVP_PKEY_derive(dh_ctx, NULL, &skeylen) <= 0) goto cleanup; /* Error */
 
   //Allocate memory
-  if (!(skey = OPENSSL_malloc(skeylen))) goto cleanup; /* Error, malloc failure */
+  if (!(skey = malloc(skeylen))) goto cleanup; /* Error, malloc failure */
 
   //Derive secret key
   if (EVP_PKEY_derive(dh_ctx, skey, &skeylen) <= 0) goto cleanup; /* Error */
@@ -347,13 +348,18 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   const int plaintext_len = 1000;
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
+  // Check using unsigned vs signed chars
+  // Don't need to allocate plaintext??
   ///////////////////////////////////////////////////////////
-  char iv[IV_LEN];
-  char key[KEY_LEN];
-  unsigned char plaintext[plaintext_len];
+  char iv = (char *) malloc(sizeof(char)*IV_LEN);
+  char key = (char *) malloc(sizeof(char)*KEY_LEN);
+  unsigned char *plaintext = (unsigned char *) malloc(sizeof(unsigned char)*plaintext_len);
   unsigned char * ciphertext = NULL;
-  if(!fread(iv, IV_LEN, 1, iv_bin));
-  if(!fread(key, KEY_LEN, 1, key_bin));
+
+  if(!iv || !key || !plaintext) goto cleanup;
+  if(!fread(iv, IV_LEN, 1, iv_bin)) goto cleanup;
+  if(!fread(key, KEY_LEN, 1, key_bin)) goto cleanup;
+  
   EVP_CIPHER_CTX *ctx;
   int len;
   int ciphertext_len;
@@ -380,6 +386,9 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   cleanup:
     // Clean up 
     if(ctx) EVP_CIPHER_CTX_free(ctx);
+    free(iv);
+    free(key);
+    free(plaintext);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
@@ -417,14 +426,17 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   int plaintext_len;
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
+  // Check using unsigned vs signed chars
+  // Don't need to allocate plaintext??
   ///////////////////////////////////////////////////////////
-  char iv[IV_LEN];
-  char key[KEY_LEN];
-  unsigned char ciphertext[ciphertext_len];
-  unsigned char * plaintext = NULL;
+  char iv = (char *) malloc(sizeof(char)*IV_LEN);
+  char key = (char *) malloc(sizeof(char)*KEY_LEN);
+  unsigned char *ciphertext = (unsigned char *) malloc(sizeof(unsigned char)*ciphertext_len);
+  unsigned char *plaintext = NULL;
 
-  if(!fread(iv, IV_LEN, 1, iv_bin));
-  if(!fread(key, KEY_LEN, 1, key_bin));
+
+  if(!fread(iv, IV_LEN, 1, iv_bin)) goto cleanup;
+  if(!fread(key, KEY_LEN, 1, key_bin)) goto cleanup;
   
   EVP_CIPHER_CTX *ctx;
   int len;
@@ -451,6 +463,9 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   cleanup:
     // Clean up 
     if(ctx) EVP_CIPHER_CTX_free(ctx);
+    free(iv);
+    free(key);
+    free(ciphertext);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
