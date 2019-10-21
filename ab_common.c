@@ -435,7 +435,7 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   int plaintext_len;
 
   // Create and initialise the context 
-  if(!(ctx = EVP_CIPHER_CTX_new())) goto err;
+  if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
 
   // Initialise the decryption operation. IMPORTANT - ensure you use a key
   // and IV size appropriate for your cipher. we are using 256 AES 
@@ -456,7 +456,7 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   cleanup:
     // Clean up 
     if(ctx) EVP_MD_CTX_destroy(ctx);
-    EVP_PKEY_CTX_free(key_ctx);
+    EVP_PKEY_CTX_free(ctx);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
