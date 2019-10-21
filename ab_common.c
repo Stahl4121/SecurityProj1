@@ -357,12 +357,14 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   
   const int IV_LEN = 16;
   const int KEY_LEN = 256;
+  const int plaintext_len = 1000;
   ///////////////////////////////////////////////////////////
-  //// CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG /////////
+  //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
   ///////////////////////////////////////////////////////////
-  const int MAX_PLAIN_LEN = 100;
   char iv[IV_LEN];
   char key[KEY_LEN];
+  unsigned char plaintext[plaintext_len];
+  unsigned char * ciphertext = NULL;
   if(!fread(iv, IV_LEN, 1, iv_bin));
   if(!fread(key, KEY_LEN, 1, key_bin));
   EVP_CIPHER_CTX *ctx;
@@ -425,14 +427,21 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
  
   const int IV_LEN = 16;
   const int KEY_LEN = 256;
+  int ciphertext_len = 1000;
+  int plaintext_len;
+  ///////////////////////////////////////////////////////////
+  //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
+  ///////////////////////////////////////////////////////////
   char iv[IV_LEN];
   char key[KEY_LEN];
+  unsigned char ciphertext[ciphertext_len];
+  unsigned char * plaintext = NULL;
+
   if(!fread(iv, IV_LEN, 1, iv_bin));
   if(!fread(key, KEY_LEN, 1, key_bin));
   
   EVP_CIPHER_CTX *ctx;
   int len;
-  int plaintext_len;
 
   // Create and initialise the context 
   if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
