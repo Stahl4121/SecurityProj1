@@ -171,16 +171,9 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
    * 
   */
 
-  //TODO: Not Sure
-  int dh_char_len = 100;
-  unsigned char *dh_pub_char = malloc(sizeof(unsigned char)*dh_char_len);
-  //long dataAmt = BIO_get_mem_data(dhpub_bio_r, &dh_pub_char);
+  char *dh_pub_char = NULL;
+  long data_amt = BIO_get_mem_data(dhpub_bio, &dh_pub_char);
 
-  BIO *dhpub_bio_r = BIO_new_file(dhpub_file, "r");
-  if(!dhpub_bio_r) goto cleanup; /* Error occurred */
-
-  long data_amt = BIO_read(dhpub_bio_r, dh_pub_char, dh_char_len); 
-  size_t dataLen = sizeof(unsigned char)*dh_char_len;
   fprintf(stderr, "%s\n", dh_pub_char);
   fprintf(stderr, "%ld\n", data_amt);
   
@@ -196,7 +189,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   fprintf(stderr, "DigestSignInit passed\n");
 
   // Call update with the memory buffer pointer 
-  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, dataLen)) fprintf(stderr, "c");//goto cleanup;
+  if(1 != EVP_DigestSignUpdate(mdctx, dh_pub_char, data_amt)) fprintf(stderr, "c");//goto cleanup;
   fprintf(stderr, "DigestSignUpdate passed\n");
 
   // Finalise the DigestSign operation 
@@ -289,26 +282,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   EVP_PKEY *rsa_pub_key = PEM_read_bio_PUBKEY(rsapub_bio, NULL, 0, NULL);
   EVP_PKEY *dh_pub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
   if (!dh_key_pair || !rsa_pub_key || !dh_pub_key) goto cleanup; /* Error occurred */
-
-
-  // //TODO: Verify signature
-
-  // // Create the Message Digest Context 
-  // if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
-
-  // if(1 != EVP_DigestVerifyInit(mdctx, NULL, EVP_sha256(), NULL, dh_pub_key)) goto cleanup;
-
-  // /* Initialize `key` with a public key */
-  // if(1 != EVP_DigestVerifyUpdate(mdctx, msg, strlen(msg))) goto cleanup;
-
-  // if(1 == EVP_DigestVerifyFinal(mdctx, sig, slen))
-  // {
-  //     /* Success */
-  // }
-  // else
-  // {
-  //     /* Failure */
-  // }
+  fprintf(stderr,"keys passed\n");
 
   //Setup context
   if(!(dh_ctx = EVP_PKEY_CTX_new(dh_key_pair, NULL))) goto cleanup; /* Error */
@@ -318,6 +292,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
     ERR_error_string(ERR_get_error(), buf);
     fprintf(stderr, "failed: %s\n", buf);// "b");//goto cleanup;
   }// goto cleanup; /* Error */
+  fprintf(stderr,"context passed\n");
 
   /* Determine buffer length */
   if (EVP_PKEY_derive(dh_ctx, NULL, &skeylen) <= 0) goto cleanup; /* Error */
