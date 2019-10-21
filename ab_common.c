@@ -351,8 +351,8 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   // Check using unsigned vs signed chars
   // Don't need to allocate plaintext??
   ///////////////////////////////////////////////////////////
-  char iv = (char *) malloc(sizeof(char)*IV_LEN);
-  char key = (char *) malloc(sizeof(char)*KEY_LEN);
+  char *iv = (char *) malloc(sizeof(char)*IV_LEN);
+  char *key = (char *) malloc(sizeof(char)*KEY_LEN);
   unsigned char *plaintext = (unsigned char *) malloc(sizeof(unsigned char)*plaintext_len);
   unsigned char * ciphertext = NULL;
 
@@ -429,8 +429,8 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   // Check using unsigned vs signed chars
   // Don't need to allocate plaintext??
   ///////////////////////////////////////////////////////////
-  char iv = (char *) malloc(sizeof(char)*IV_LEN);
-  char key = (char *) malloc(sizeof(char)*KEY_LEN);
+  char *iv = (char *) malloc(sizeof(char)*IV_LEN);
+  char *key = (char *) malloc(sizeof(char)*KEY_LEN);
   unsigned char *ciphertext = (unsigned char *) malloc(sizeof(unsigned char)*ciphertext_len);
   unsigned char *plaintext = NULL;
 
