@@ -264,7 +264,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   EVP_PKEY_CTX *dh_ctx;
   unsigned char *skey;
   size_t skeylen;
-  int err = 1;
+  int err = 0;
 
   //Open Files
   BIO *rsapub_bio = BIO_new_file(rsapub_file, "r");
@@ -346,6 +346,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
  */
 int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file, const char *ctext_file)
 {
+  int err = 0;
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) err=1;//goto cleanup; 
   FILE *iv_bin = fopen(iv_file, "rb");
@@ -419,6 +420,7 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
  */
 int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file, const char *ptext_file)
 {
+  int err = 0;
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) err=1; 
   FILE *iv_bin = fopen(iv_file, "rb");
