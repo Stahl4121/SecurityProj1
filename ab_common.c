@@ -274,12 +274,12 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   BIO *dhpub_bio = BIO_new_file(dhpub_file, "r");
   if(!dhpub_bio) goto cleanup; /* Error occurred */
   FILE *sig_bin = fopen(sig_file, "r");
-  if(!sig_bin) goto cleanup; /* Error occurred */
+  if(!sig_bin) err=1; /* Error occurred */
   FILE *key_bin = fopen(key_file, "wb+");
-  if(!key_bin) goto cleanup; /* Error occurred */
+  if(!key_bin) err=1; /* Error occurred */
   FILE *iv_bin = fopen(iv_file, "wb+");
-  if(!iv_bin) goto cleanup; /* Error occurred */
-
+  if(!iv_bin) err=1; /* Error occurred */
+  if(err) goto cleanup;
   //Read PEM-encoded keys into EVP_PKEY structures
   EVP_PKEY *dh_key_pair = PEM_read_bio_PrivateKey(dhpair_bio, NULL, 0, NULL);
   EVP_PKEY *rsa_pub_key = PEM_read_bio_PUBKEY(rsapub_bio, NULL, 0, NULL);
@@ -347,13 +347,16 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
 int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file, const char *ctext_file)
 {
   FILE *key_bin = fopen(key_file, "rb");
-  if(!key_bin) goto cleanup; 
+  if(!key_bin) err=1;//goto cleanup; 
   FILE *iv_bin = fopen(iv_file, "rb");
-  if(!iv_bin) goto cleanup; 
+  if(!iv_bin) err=1; 
   FILE *ptext_bin = fopen(ptext_file, "rb");
-  if(!ptext_bin) goto cleanup; 
+  if(!ptext_bin) err=1; 
   FILE *ctext_bin = fopen(ctext_file, "wb+");
-  if(!ctext_bin) goto cleanup; 
+  if(!ctext_bin) err=1; 
+
+  if(err) goto cleanup;
+
   
   const int IV_LEN = 16;
   const int KEY_LEN = 256;
@@ -417,14 +420,14 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
 int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file, const char *ptext_file)
 {
   FILE *key_bin = fopen(key_file, "rb");
-  if(!key_bin) goto cleanup; 
+  if(!key_bin) err=1; 
   FILE *iv_bin = fopen(iv_file, "rb");
-  if(!iv_bin) goto cleanup; 
+  if(!iv_bin) err=1; 
   FILE *ptext_bin = fopen(ptext_file, "wb+");
-  if(!ptext_bin) goto cleanup; 
+  if(!ptext_bin) err=1; 
   FILE *ctext_bin = fopen(ctext_file, "rb");
-  if(!ctext_bin) goto cleanup; 
- 
+  if(!ctext_bin) err=1; 
+  if(err) goto cleanup;
   const int IV_LEN = 16;
   const int KEY_LEN = 256;
   int ciphertext_len = 1000;
