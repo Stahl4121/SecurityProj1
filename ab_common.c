@@ -205,7 +205,6 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   sigErr = 0;
 
   cleanup:
-    if(sig) OPENSSL_free(sig);
     if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_CTX_free(dh_ctx);
     EVP_PKEY_CTX_free(rsa_ctx);
@@ -218,7 +217,9 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
     BIO_free(dhpair_bio);
     BIO_free(dhpub_bio);
     BIO_free(dhpub_mem_bio);
+    free(sig);
     fclose(sig_bin);
+
     if(keyErr){
       fprintf(stderr, "error in key generation");
     }
@@ -332,13 +333,12 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if(IV_LEN != fwrite(skey+KEY_LEN, 1, IV_LEN, iv_bin)) goto cleanup;
   
   //TODO: Testing code, REMOVE
-  FILE *temp = fopen("temp.txt", "wb+");
-  if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
+  // FILE *temp = fopen("temp.txt", "wb+");
+  // if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
 
   err = 0;
 
   cleanup:
-    if(skey) OPENSSL_free(skey);
     EVP_PKEY_CTX_free(dh_ctx);
     EVP_PKEY_free(dh_key_pair);
     EVP_PKEY_free(rsa_pub_key);
@@ -346,6 +346,8 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
     BIO_free(rsapub_bio);
     BIO_free(dhpair_bio);
     BIO_free(dhpub_bio);
+    BIO_free(dhpub_mem_bio);
+    free(skey);
     free(sig);
     fclose(sig_bin);
     fclose(key_bin);
