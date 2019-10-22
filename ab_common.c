@@ -324,8 +324,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   //Derive secret key
   if (EVP_PKEY_derive(dh_ctx, skey, &skeylen) <= 0) goto cleanup; /* Error */
 
-  //Write first 256 bytes of skey to the key, and the next 16 to the IV
-  // (matches DH keysize of 2048bits)
+  //Write first 32 bytes of skey to the key, and the next 16 to the IV
   const int IV_LEN = 16;
   const int KEY_LEN = 32;
 
@@ -341,7 +340,6 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   cleanup:
     EVP_PKEY_CTX_free(dh_ctx);
     EVP_PKEY_CTX_free(mdctx);
-
     EVP_PKEY_free(dh_key_pair);
     EVP_PKEY_free(rsa_pub_key);
     EVP_PKEY_free(dh_pub_key);
