@@ -327,19 +327,21 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   //Write first 256 bytes of skey to the key, and the next 16 to the IV
   // (matches DH keysize of 2048bits)
   const int IV_LEN = 16;
-  const int KEY_LEN = 256;
+  const int KEY_LEN = 32;
 
   if(KEY_LEN != fwrite(skey, 1, KEY_LEN, key_bin)) goto cleanup;
   if(IV_LEN != fwrite(skey+KEY_LEN, 1, IV_LEN, iv_bin)) goto cleanup;
   
   //TODO: Testing code, REMOVE
-  // FILE *temp = fopen("temp.txt", "wb+");
-  // if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
+  //FILE *temp = fopen("temp.txt", "wb+");
+  //if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
 
   err = 0;
 
   cleanup:
     EVP_PKEY_CTX_free(dh_ctx);
+    EVP_PKEY_CTX_free(mdctx);
+
     EVP_PKEY_free(dh_key_pair);
     EVP_PKEY_free(rsa_pub_key);
     EVP_PKEY_free(dh_pub_key);
@@ -391,7 +393,7 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(ptext_len != fread(plaintext, 1, ptext_len, ptext_bin)) goto cleanup;
 
   const int IV_LEN = 16;
-  const int KEY_LEN = 256;
+  const int KEY_LEN = 32;
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
   // Check using unsigned vs signed chars
@@ -472,7 +474,7 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   if(ctext_len != fread(ciphertext, 1, ctext_len, ctext_bin)) goto cleanup;
 
   const int IV_LEN = 16;
-  const int KEY_LEN = 256;
+  const int KEY_LEN = 32;
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
   // Check using unsigned vs signed chars
