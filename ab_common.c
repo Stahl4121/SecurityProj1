@@ -66,7 +66,8 @@ static void __hexdump(FILE *fp, const char *label, uint8_t *buf, size_t buf_len)
  */
 int ab_generate_dhparams(const char *dhparams_file)
 {
-  int err = 1;
+  //Setup variables
+  int err = 1; //Boolean flag for errors
   BIO *dhparams_bio;
   dhparams_bio = BIO_new_file(dhparams_file, "w");
   if(!dhparams_bio) goto cleanup; /* Error occurred */
@@ -139,9 +140,9 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if(!sig_bin) goto cleanup; /* Error occurred */
 
 
+  //Initialize PKEY stuff
   EVP_PKEY_CTX *rsa_ctx = NULL;
   EVP_PKEY_CTX *dh_ctx = NULL;
-  
   EVP_PKEY *dhpair_key = NULL;
   EVP_PKEY *rsapair_key = NULL;
 
@@ -248,7 +249,8 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
                          const char *dhpub_file, const char *sig_file, 
                          const char *key_file, const char *iv_file)
 {
-  int err = 1;
+  //Setup variables
+  int err = 1;  //Boolean flag for error
   EVP_PKEY_CTX *dh_ctx;
   unsigned char *skey;
   size_t skeylen;
@@ -292,7 +294,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if(!sig) goto cleanup;
   if(slen != fread(sig, 1, slen, sig_bin)) goto cleanup;
 
-  /* Verify hash */
+  /* Verify signature */
 
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
@@ -304,6 +306,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   // Call update with the memory buffer pointer 
   if(1 != EVP_DigestVerifyUpdate(mdctx, dh_pub_char, data_amt)) goto cleanup;
 
+  //Check that our computed signature matches the one we received
   if(1 != EVP_DigestVerifyFinal(mdctx, sig, slen)){
       fprintf(stderr, "Error! Signature Verification failed!");
       goto cleanup;
@@ -328,14 +331,11 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   const int IV_LEN = 16;
   const int KEY_LEN = 32;
 
+  //Write keys to files
   if(KEY_LEN != fwrite(skey, 1, KEY_LEN, key_bin)) goto cleanup;
   if(IV_LEN != fwrite(skey+KEY_LEN, 1, IV_LEN, iv_bin)) goto cleanup;
-  
-  //TODO: Testing code, REMOVE
-  //FILE *temp = fopen("temp.txt", "wb+");
-  //if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
 
-  err = 0;
+  err = 0; 
 
   cleanup:
     EVP_PKEY_CTX_free(dh_ctx);
@@ -373,6 +373,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
  */
 int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file, const char *ctext_file)
 {
+  //Open files
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) goto cleanup; 
   FILE *iv_bin = fopen(iv_file, "rb");
@@ -390,13 +391,11 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(!plaintext) goto cleanup;
   if(ptext_len != fread(plaintext, 1, ptext_len, ptext_bin)) goto cleanup;
 
+  //Appropriate length for IV as 128bits for AES-256 
   const int IV_LEN = 16;
   const int KEY_LEN = 32;
-  ///////////////////////////////////////////////////////////
-  //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
-  // Check using unsigned vs signed chars
-  // Also, what size ciphertext?
-  ///////////////////////////////////////////////////////////
+
+  //Allocate memory to store IV, key, and ciphertext
   unsigned char *iv = (unsigned char *) malloc(sizeof(char)*IV_LEN);
   unsigned char *key = (unsigned char *) malloc(sizeof(char)*KEY_LEN);
   unsigned char *ciphertext = malloc(ptext_len + 0.2*ptext_len); //Add 20% to length of plaintext since ciphertext may be longer 
@@ -412,9 +411,7 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   // Create and initialise the context 
   if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
 
-  // Initialise the encryption operation. IMPORTANT - ensure you use a key
-  // and IV size appropriate for your cipher. we are using 256  AES 
-  // IV size same as the block size: 128 bits?
+  // Initialise the encryption operation
   if(1 != EVP_EncryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
   
   // Provide the message to be encrypted, and obtain the encrypted output.
@@ -441,7 +438,6 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   return 0;
 }
 
-
 /*
  * Decrypts ciphertext using symmetric encryption
  *
@@ -454,6 +450,7 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
  */
 int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file, const char *ptext_file)
 {
+  //Open files
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) goto cleanup; 
   FILE *iv_bin = fopen(iv_file, "rb");
@@ -473,11 +470,8 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
 
   const int IV_LEN = 16;
   const int KEY_LEN = 32;
-  ///////////////////////////////////////////////////////////
-  //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
-  // Check using unsigned vs signed chars
-  // Also, what size plaintext?
-  ///////////////////////////////////////////////////////////
+  
+  //Allocate memory to store IV, key, and plaintext
   unsigned char *iv = (unsigned char *) malloc(sizeof(char)*IV_LEN);
   unsigned char *key = (unsigned char *) malloc(sizeof(char)*KEY_LEN);
   unsigned char *plaintext = malloc(ctext_len + 1); 
