@@ -287,11 +287,9 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   fseek(sig_bin, 0, SEEK_END);
   long slen = ftell(sig_bin);
   fseek(sig_bin, 0, SEEK_SET);
-
   sig = malloc(slen + 1);
   if(!sig) goto cleanup;
   if(slen != fread(sig, 1, slen, sig_bin)) goto cleanup;
-
 
   /* Verify hash */
 
@@ -382,27 +380,32 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   FILE *ctext_bin = fopen(ctext_file, "wb+");
   if(!ctext_bin) goto cleanup; 
 
-  
+  //Retrieve plaintext from file
+  fseek(ptext_bin, 0, SEEK_END);
+  long ptext_len = ftell(ptext_bin);
+  fseek(ptext_bin, 0, SEEK_SET);
+  unsigned char *plaintext = malloc(ptext_len + 1);
+  if(!plaintext) goto cleanup;
+  if(ptext_len != fread(plaintext, 1, ptext_len, ptext_bin)) goto cleanup;
+
   const int IV_LEN = 16;
   const int KEY_LEN = 256;
-  const int plaintext_len = 1000;
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
   // Check using unsigned vs signed chars
-  // Also, we don't need to allocate ciphertext?
+  // Also, what size ciphertext?
   ///////////////////////////////////////////////////////////
   unsigned char *iv = (unsigned char *) malloc(sizeof(char)*IV_LEN);
   unsigned char *key = (unsigned char *) malloc(sizeof(char)*KEY_LEN);
-  unsigned char *plaintext = (unsigned char *) malloc(sizeof(char)*plaintext_len);
-  unsigned char * ciphertext = NULL;
+  unsigned char *ciphertext = malloc(ptext_len + 0.2*ptext_len); //Add 20% to length of plaintext since ciphertext may be longer 
 
   if(!iv || !key || !plaintext) goto cleanup;
   if(!fread(iv, IV_LEN, 1, iv_bin)) goto cleanup;
   if(!fread(key, KEY_LEN, 1, key_bin)) goto cleanup;
   
   EVP_CIPHER_CTX *ctx;
-  int len;
-  int ciphertext_len;
+  int ctext_len;
+  int tmp_len;
 
   // Create and initialise the context 
   if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
@@ -413,15 +416,13 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   if(1 != EVP_EncryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
   
   // Provide the message to be encrypted, and obtain the encrypted output.
-  // EVP_EncryptUpdate can be called multiple times if necessary
-  if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)) goto cleanup;
-  ciphertext_len = len;
+  if(1 != EVP_EncryptUpdate(ctx, ciphertext, &ctext_len, plaintext, ptext_len)) goto cleanup;
 
   // Finalise the encryption. Further ciphertext bytes may be written at this stage.
-  if(1 != EVP_EncryptFinal(ctx, ciphertext + len, &len)) goto cleanup;
-  ciphertext_len += len;
-  // Clean up
-  EVP_CIPHER_CTX_free(ctx);
+  if(1 != EVP_EncryptFinal(ctx, ciphertext + ctext_len, &tmp_len)) goto cleanup;
+  ctext_len += tmp_len;
+
+  if(ctext_len != fwrite(ciphertext, 1, ctext_len, ctext_bin)) goto cleanup;
 
   cleanup:
     // Clean up 
@@ -429,12 +430,12 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
     free(iv);
     free(key);
     free(plaintext);
+    free(ciphertext);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
     fclose(ctext_bin);
 
-  
   return 0;
 }
 
@@ -460,26 +461,32 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   FILE *ctext_bin = fopen(ctext_file, "rb");
   if(!ctext_bin) goto cleanup; 
 
+  //Retrieve ciphertext from file
+  fseek(ctext_bin, 0, SEEK_END);
+  long ctext_len = ftell(ctext_bin);
+  fseek(ctext_bin, 0, SEEK_SET);
+  unsigned char *ciphertext = malloc(ctext_len + 1);
+  if(!ciphertext) goto cleanup;
+  if(ctext_len != fread(ciphertext, 1, ctext_len, ctext_bin)) goto cleanup;
+
   const int IV_LEN = 16;
   const int KEY_LEN = 256;
-  int ciphertext_len = 1000;
-  int plaintext_len;
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
   // Check using unsigned vs signed chars
-  // Don't need to allocate plaintext??
+  // Also, what size plaintext?
   ///////////////////////////////////////////////////////////
   unsigned char *iv = (unsigned char *) malloc(sizeof(char)*IV_LEN);
   unsigned char *key = (unsigned char *) malloc(sizeof(char)*KEY_LEN);
-  unsigned char *ciphertext = (unsigned char *) malloc(sizeof(unsigned char)*ciphertext_len);
-  unsigned char *plaintext = NULL;
+  unsigned char *plaintext = malloc(ctext_len + 1); 
 
-
+  if(!iv || !key || !plaintext) goto cleanup;
   if(!fread(iv, IV_LEN, 1, iv_bin)) goto cleanup;
   if(!fread(key, KEY_LEN, 1, key_bin)) goto cleanup;
   
   EVP_CIPHER_CTX *ctx;
-  int len;
+  int ptext_len; 
+  int tmp_len;
 
   // Create and initialise the context 
   if(!(ctx = EVP_CIPHER_CTX_new())) goto cleanup;
@@ -489,23 +496,21 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   if(1 != EVP_DecryptInit(ctx, EVP_aes_256_ctr(), key, iv)) goto cleanup;
   
   // Provide the ciphertext to be decrypted, and obtain the decrypted output.
-  // EVP_DecryptUpdate can be called multiple times if necessary
-  if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) goto cleanup;
-  plaintext_len = len;
+  if(1 != EVP_DecryptUpdate(ctx, plaintext, &ptext_len, ciphertext, ctext_len)) goto cleanup;
 
   // Finalise the encryption. Further ciphertext bytes may be written at this stage.
-  if(1 != EVP_DecryptFinal(ctx, plaintext + len, &len)) goto cleanup;
-  plaintext_len += len;
-  // Clean up
-  EVP_CIPHER_CTX_free(ctx);
+  if(1 != EVP_DecryptFinal(ctx, plaintext + ptext_len, &tmp_len)) goto cleanup;
+  ptext_len += tmp_len;
 
-  // return plaintext_len;
+  if(ptext_len != fwrite(plaintext, 1, ptext_len, ptext_bin)) goto cleanup;
+
   cleanup:
     // Clean up 
     if(ctx) EVP_CIPHER_CTX_free(ctx);
     free(iv);
     free(key);
     free(ciphertext);
+    free(plaintext);
     fclose(key_bin);
     fclose(iv_bin);
     fclose(ptext_bin);
@@ -513,4 +518,3 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
 
   return 0;
 }
-
