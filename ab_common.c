@@ -172,16 +172,15 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
    * 
   */
 
+  //Store DH Public Key in Memory Buffer
   BIO *dhpub_mem_bio = BIO_new(BIO_s_mem());
   if(!dhpub_mem_bio) goto cleanup; /* Error occurred */
-
-  if (!PEM_write_bio_PUBKEY(dhpub_mem_bio, rsapair_key)) goto cleanup;
-
+  if (!PEM_write_bio_PUBKEY(dhpub_mem_bio, dhpair_key)) goto cleanup;
   char *dh_pub_char = NULL;
   long data_amt = BIO_get_mem_data(dhpub_mem_bio, &dh_pub_char);
   
   // Create the Message Digest Context 
-  if(!(mdctx = EVP_MD_CTX_create())) fprintf(stderr, "a");//goto cleanup;
+  if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
 
   // Initialise the DigestSign operation - SHA-256 has been selected as the message digest function
   if(1 != EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, rsapair_key)) goto cleanup;
@@ -253,6 +252,10 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   unsigned char *skey;
   size_t skeylen;
 
+  //Setup for signature 
+  EVP_MD_CTX *mdctx = NULL;
+  uint8_t *sig = NULL;
+
   //Open Files
   BIO *rsapub_bio = BIO_new_file(rsapub_file, "r");
   if(!rsapub_bio) goto cleanup; /* Error occurred */
@@ -273,6 +276,41 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   EVP_PKEY *dh_pub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
   if (!dh_key_pair || !rsa_pub_key || !dh_pub_key) goto cleanup; /* Error occurred */
 
+  //Store DH Public Key in Memory Buffer
+  BIO *dhpub_mem_bio = BIO_new(BIO_s_mem());
+  if(!dhpub_mem_bio) goto cleanup; /* Error occurred */
+  if (!PEM_write_bio_PUBKEY(dhpub_mem_bio, dh_pub_key)) goto cleanup;
+  char *dh_pub_char = NULL;
+  long data_amt = BIO_get_mem_data(dhpub_mem_bio, &dh_pub_char);
+  
+  //Retrieve signature from file
+  fseek(sig_bin, 0, SEEK_END);
+  long slen = ftell(sig_bin);
+  fseek(sig_bin, 0, SEEK_SET);
+
+  sig = malloc(slen + 1);
+  if(!sig) goto cleanup;
+  if(slen != fread(sig, 1, slen, sig_bin)) goto cleanup;
+
+
+  /* Verify hash */
+
+  // Create the Message Digest Context 
+  if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
+
+
+  /* Initialize `key` with a public key */
+  if(1 != EVP_DigestVerifyInit(mdctx, NULL, EVP_sha256(), NULL, rsa_pub_key)) goto cleanup;
+
+  // Call update with the memory buffer pointer 
+  if(1 != EVP_DigestVerifyUpdate(mdctx, dh_pub_char, data_amt)) goto cleanup;
+
+  if(1 != EVP_DigestVerifyFinal(mdctx, sig, slen)){
+      fprintf(stderr, "Error! Signature Verification failed!");
+      goto cleanup;
+  }
+
+  //Begin deriving secret key
   //Setup context
   if(!(dh_ctx = EVP_PKEY_CTX_new(dh_key_pair, NULL))) goto cleanup; /* Error */
   if (EVP_PKEY_derive_init(dh_ctx) <= 0) goto cleanup; /* Error */
@@ -295,7 +333,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if(KEY_LEN != fwrite(skey, 1, KEY_LEN, key_bin)) goto cleanup;
   if(IV_LEN != fwrite(skey+KEY_LEN, 1, IV_LEN, iv_bin)) goto cleanup;
   
-  //TODO: REMOVE
+  //TODO: Testing code, REMOVE
   FILE *temp = fopen("temp.txt", "wb+");
   if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
 
@@ -310,6 +348,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
     BIO_free(rsapub_bio);
     BIO_free(dhpair_bio);
     BIO_free(dhpub_bio);
+    free(sig);
     fclose(sig_bin);
     fclose(key_bin);
     fclose(iv_bin);
