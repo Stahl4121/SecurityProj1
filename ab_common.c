@@ -272,17 +272,11 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   EVP_PKEY *rsa_pub_key = PEM_read_bio_PUBKEY(rsapub_bio, NULL, 0, NULL);
   EVP_PKEY *dh_pub_key = PEM_read_bio_PUBKEY(dhpub_bio, NULL, 0, NULL);
   if (!dh_key_pair || !rsa_pub_key || !dh_pub_key) goto cleanup; /* Error occurred */
-  fprintf(stderr,"keys passed\n");
 
   //Setup context
   if(!(dh_ctx = EVP_PKEY_CTX_new(dh_key_pair, NULL))) goto cleanup; /* Error */
   if (EVP_PKEY_derive_init(dh_ctx) <= 0) goto cleanup; /* Error */
-  if (EVP_PKEY_derive_set_peer(dh_ctx, dh_pub_key) <= 0){
-    char *buf = malloc(sizeof(unsigned char) * (80));
-    ERR_error_string(ERR_get_error(), buf);
-    fprintf(stderr, "failed: %s\n", buf);// "b");//goto cleanup;
-  }// goto cleanup; /* Error */
-  fprintf(stderr,"context passed\n");
+  if (EVP_PKEY_derive_set_peer(dh_ctx, dh_pub_key) <= 0) goto cleanup; /* Error */
 
   /* Determine buffer length */
   if (EVP_PKEY_derive(dh_ctx, NULL, &skeylen) <= 0) goto cleanup; /* Error */
@@ -293,10 +287,17 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   //Derive secret key
   if (EVP_PKEY_derive(dh_ctx, skey, &skeylen) <= 0) goto cleanup; /* Error */
 
-  //TODO: Don't know how to do this correctly
-  //Write first 256 bytes of skey to a file (matches DH keysize of 2048bits)
-  if(0 >= fwrite(skey, 1, 256, key_bin)) goto cleanup;
-  if(0 >= fwrite(skey, 1, 16, iv_bin)) goto cleanup;
+  //Write first 256 bytes of skey to the key, and the next 16 to the IV
+  // (matches DH keysize of 2048bits)
+  const int IV_LEN = 16;
+  const int KEY_LEN = 256;
+
+  if(KEY_LEN != fwrite(skey, 1, KEY_LEN, key_bin)) goto cleanup;
+  if(IV_LEN != fwrite(skey+KEY_LEN, 1, IV_LEN, iv_bin)) goto cleanup;
+  
+  //TODO: REMOVE
+  FILE *temp = fopen("temp.txt", "wb+");
+  if(272 != fwrite(skey, 1, 272, temp)) goto cleanup;
 
   err = 0;
 
@@ -349,11 +350,11 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   ///////////////////////////////////////////////////////////
   //// ^^^^  CHECK THIS WITH DR. AL MOAKAR FOR LEN OF MSG ////
   // Check using unsigned vs signed chars
-  // Don't need to allocate plaintext??
+  // Also, we don't need to allocate ciphertext?
   ///////////////////////////////////////////////////////////
-  char *iv = (char *) malloc(sizeof(char)*IV_LEN);
-  char *key = (char *) malloc(sizeof(char)*KEY_LEN);
-  unsigned char *plaintext = (unsigned char *) malloc(sizeof(unsigned char)*plaintext_len);
+  unsigned char *iv = (unsigned char *) malloc(sizeof(char)*IV_LEN);
+  unsigned char *key = (unsigned char *) malloc(sizeof(char)*KEY_LEN);
+  unsigned char *plaintext = (unsigned char *) malloc(sizeof(char)*plaintext_len);
   unsigned char * ciphertext = NULL;
 
   if(!iv || !key || !plaintext) goto cleanup;
@@ -429,8 +430,8 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
   // Check using unsigned vs signed chars
   // Don't need to allocate plaintext??
   ///////////////////////////////////////////////////////////
-  char *iv = (char *) malloc(sizeof(char)*IV_LEN);
-  char *key = (char *) malloc(sizeof(char)*KEY_LEN);
+  unsigned char *iv = (unsigned char *) malloc(sizeof(char)*IV_LEN);
+  unsigned char *key = (unsigned char *) malloc(sizeof(char)*KEY_LEN);
   unsigned char *ciphertext = (unsigned char *) malloc(sizeof(unsigned char)*ciphertext_len);
   unsigned char *plaintext = NULL;
 
