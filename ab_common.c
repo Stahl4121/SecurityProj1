@@ -339,7 +339,7 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
 
   cleanup:
     EVP_PKEY_CTX_free(dh_ctx);
-    EVP_PKEY_CTX_free(mdctx);
+    if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_free(dh_key_pair);
     EVP_PKEY_free(rsa_pub_key);
     EVP_PKEY_free(dh_pub_key);
