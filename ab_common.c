@@ -75,19 +75,25 @@ int ab_generate_dhparams(const char *dhparams_file)
   /* Create the context for generating the parameters */
   EVP_PKEY_CTX *pctx = NULL;
   EVP_PKEY *dh_params = NULL;
+
   if(!(pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL))) goto cleanup;
   if(!EVP_PKEY_paramgen_init(pctx)) goto cleanup;
+
   /* Set a prime length of 2048 */
   if(!EVP_PKEY_CTX_set_dh_paramgen_prime_len(pctx, 2048)) goto cleanup;
+
   /* Generate parameters */
   if (!EVP_PKEY_paramgen(pctx, &dh_params)) goto cleanup; 
+
   /* write the params to the file */
   PEM_write_bio_Parameters(dhparams_bio, dh_params);
   err = 0;
   
+  // Clean up memory and files 
   cleanup:
     /* Clean up */
-    EVP_PKEY_CTX_free(pctx);
+    if (pctx) EVP_PKEY_CTX_free(pctx);
+    EVP_PKEY_free(dh_params);    
     BIO_free(dhparams_bio);
 
     /* Do some error handling */
@@ -146,13 +152,17 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   EVP_PKEY *dhpair_key = NULL;
   EVP_PKEY *rsapair_key = NULL;
 
+  //Read dh_params
   EVP_PKEY *dh_params = PEM_read_bio_Parameters(dhparams_bio, NULL);
+
+  //Create PKEY from dhparams info
   if(!(dh_ctx = EVP_PKEY_CTX_new(dh_params, NULL))) goto cleanup; 
   if(!EVP_PKEY_keygen_init(dh_ctx)) goto cleanup; 
+  
   // Generate the dh key pair 
   if (!EVP_PKEY_keygen(dh_ctx, &dhpair_key)) goto cleanup;
 
-  // RSA 
+  /* RSA */
   if(!(rsa_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL))) goto cleanup;
   if(!EVP_PKEY_keygen_init(rsa_ctx)) goto cleanup; 
   // RSA keys set the key length during key generation rather than parameter generation! 
@@ -166,6 +176,7 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   if (!PEM_write_bio_PUBKEY(dhpub_bio, dhpair_key)) goto cleanup;
   if (!PEM_write_bio_PUBKEY(rsapub_bio, rsapair_key)) goto cleanup;
 
+  //No keygen errors
   keyErr = 0;
 
   /*
@@ -203,8 +214,9 @@ int ab_generate_keys(const char *dhparams_file, const char *rsapair_file,
   // write sig to a file 
   if(0 >= fwrite(sig, slen, 1, sig_bin)) goto cleanup;
   
-  sigErr = 0;
+  sigErr = 0; //No sig generation errors
 
+  // Clean up memory and files 
   cleanup:
     if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_CTX_free(dh_ctx);
@@ -299,7 +311,6 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   // Create the Message Digest Context 
   if(!(mdctx = EVP_MD_CTX_create())) goto cleanup;
 
-
   /* Initialize `key` with a public key */
   if(1 != EVP_DigestVerifyInit(mdctx, NULL, EVP_sha256(), NULL, rsa_pub_key)) goto cleanup;
 
@@ -335,10 +346,11 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
   if(KEY_LEN != fwrite(skey, 1, KEY_LEN, key_bin)) goto cleanup;
   if(IV_LEN != fwrite(skey+KEY_LEN, 1, IV_LEN, iv_bin)) goto cleanup;
 
-  err = 0; 
+  err = 0; //No errors if this was reached
 
+  // Clean up memory and files 
   cleanup:
-    EVP_PKEY_CTX_free(dh_ctx);
+    if(dh_ctx) EVP_PKEY_CTX_free(dh_ctx);
     if(mdctx) EVP_MD_CTX_destroy(mdctx);
     EVP_PKEY_free(dh_key_pair);
     EVP_PKEY_free(rsa_pub_key);
@@ -373,6 +385,9 @@ int ab_derive_secret_key(const char *rsapub_file, const char *dhpair_file,
  */
 int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file, const char *ctext_file)
 {
+
+  int err = 1; //Boolean flag for whether there were errors
+
   //Open files
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) goto cleanup; 
@@ -422,9 +437,11 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
   ctext_len += tmp_len;
 
   if(ctext_len != fwrite(ciphertext, 1, ctext_len, ctext_bin)) goto cleanup;
+  
+  err = 0; //No errors if this was reached
 
+  // Clean up memory and files 
   cleanup:
-    // Clean up 
     if(ctx) EVP_CIPHER_CTX_free(ctx);
     free(iv);
     free(key);
@@ -434,6 +451,10 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
     fclose(iv_bin);
     fclose(ptext_bin);
     fclose(ctext_bin);
+    
+    if(err){
+      fprintf(stderr, "error");
+    }
 
   return 0;
 }
@@ -450,6 +471,8 @@ int ab_encrypt(const char *key_file, const char *iv_file, const char *ptext_file
  */
 int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file, const char *ptext_file)
 {
+  int err = 1; //Boolean flag for whether there were errors
+
   //Open files
   FILE *key_bin = fopen(key_file, "rb");
   if(!key_bin) goto cleanup; 
@@ -500,8 +523,10 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
 
   if(ptext_len != fwrite(plaintext, 1, ptext_len, ptext_bin)) goto cleanup;
 
+  err = 0; //No errors if this was reached
+
+  // Clean up memory and files 
   cleanup:
-    // Clean up 
     if(ctx) EVP_CIPHER_CTX_free(ctx);
     free(iv);
     free(key);
@@ -511,6 +536,10 @@ int ab_decrypt(const char *key_file, const char *iv_file, const char *ctext_file
     fclose(iv_bin);
     fclose(ptext_bin);
     fclose(ctext_bin);
+
+    if(err){
+      fprintf(stderr, "error");
+    }
 
   return 0;
 }
